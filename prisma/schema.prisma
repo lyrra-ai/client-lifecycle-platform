@@ -1,0 +1,486 @@
+// Client Lifecycle Platform — Data Model
+// Mirrors System Design §3. Every table (except Tenant itself) carries
+// tenant_id, enforced here via a required relation — there is no
+// "single business" shortcut anywhere in this schema (System Design §1.1).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Root
+// ─────────────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id               String   @id @default(cuid())
+  businessName     String
+  gstNumber        String? // nullable — many tenants sit under the ₹20L threshold (System Design §4)
+  defaultCurrency  String   @default("INR")
+  razorpayAccountId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users            User[]
+  clients          Client[]
+  leads            Lead[]
+  engagements      Engagement[]
+  followUpRules    FollowUpRule[]
+
+  @@map("tenants")
+}
+
+enum UserRole {
+  owner
+  team_member
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  email     String
+  phone     String?
+  role      UserRole @default(owner)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Lead → Client → Engagement (the spine, System Design §3)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  lost
+}
+
+enum LeadSource {
+  manual
+  web_form
+  whatsapp
+}
+
+model Client {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  name              String
+  company            String?
+  email             String?
+  phone             String?
+  country           String?
+  preferredCurrency String   @default("INR")
+  createdAt         DateTime @default(now())
+
+  leads       Lead[]
+  engagements Engagement[]
+
+  @@index([tenantId])
+  @@map("clients")
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  clientId  String?
+  client    Client?    @relation(fields: [clientId], references: [id])
+  source    LeadSource @default(manual)
+  status    LeadStatus @default(new)
+  notes     String?
+  createdAt DateTime   @default(now())
+
+  engagements Engagement[]
+
+  @@index([tenantId])
+  @@map("leads")
+}
+
+// System Design §3.1 — the single state machine every other entity hangs off.
+enum EngagementStage {
+  lead
+  proposal_sent
+  proposal_accepted
+  deposit_invoiced
+  deposit_paid
+  onboarding
+  kickoff_scheduled
+  kickoff_done
+  in_delivery
+  feedback_requested
+  handed_over
+  closed
+}
+
+model Engagement {
+  id        String          @id @default(cuid())
+  tenantId  String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  clientId  String
+  client    Client          @relation(fields: [clientId], references: [id])
+  leadId    String?
+  lead      Lead?           @relation(fields: [leadId], references: [id])
+  stage     EngagementStage @default(lead)
+  currency  String          @default("INR")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // A manual stage change is logged with a reason — the tool must not fight
+  // the owner's judgment call (System Design §3.1).
+  stageChangeLogs EngagementStageLog[]
+
+  proposals       Proposal[]
+  invoices        Invoice[]
+  welcomeDocs     WelcomeDoc[]
+  intakeForms     IntakeForm[]
+  accessRequests  AccessRequest[]
+  kickoffCalls    KickoffCall[]
+  followUpTasks   FollowUpTask[]
+  feedbackRequests FeedbackRequest[]
+  handoverPackets HandoverPacket[]
+
+  @@index([tenantId])
+  @@index([tenantId, stage])
+  @@map("engagements")
+}
+
+model EngagementStageLog {
+  id           String          @id @default(cuid())
+  engagementId String
+  engagement   Engagement      @relation(fields: [engagementId], references: [id])
+  fromStage    EngagementStage
+  toStage      EngagementStage
+  reason       String? // required for manual reverts/advances, optional for automatic transitions
+  automatic    Boolean         @default(false)
+  changedAt    DateTime        @default(now())
+
+  @@index([engagementId])
+  @@map("engagement_stage_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Proposal Service (System Design §2)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ProposalStatus {
+  draft
+  sent
+  viewed
+  accepted
+  declined
+  expired
+}
+
+model Proposal {
+  id           String         @id @default(cuid())
+  engagementId String
+  engagement   Engagement     @relation(fields: [engagementId], references: [id])
+  version      Int            @default(1)
+  status       ProposalStatus @default(draft)
+  validUntil   DateTime?
+  pdfUrl       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  lineItems  ProposalLineItem[]
+  esignEvents EsignEvent[]
+
+  @@index([engagementId])
+  @@map("proposals")
+}
+
+model ProposalLineItem {
+  id          String   @id @default(cuid())
+  proposalId  String
+  proposal    Proposal @relation(fields: [proposalId], references: [id])
+  description String
+  qty         Decimal  @db.Decimal(10, 2)
+  // stored in the smallest currency unit (paise/cents) to avoid
+  // floating-point rounding errors across mixed INR/USD lines (PRD §4).
+  unitPriceMinor BigInt
+  currency    String
+
+  @@index([proposalId])
+  @@map("proposal_line_items")
+}
+
+model EsignEvent {
+  id             String    @id @default(cuid())
+  proposalId     String
+  proposal       Proposal  @relation(fields: [proposalId], references: [id])
+  signerName     String
+  signerPhone    String
+  otpVerifiedAt  DateTime?
+  ipAddress      String?
+  signedPdfUrl   String?
+  createdAt      DateTime  @default(now())
+  // Immutable once created (PRD §5) — no update path is exposed by the
+  // Proposal Service for this model; a changed term means a new Proposal version.
+
+  @@index([proposalId])
+  @@map("esign_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Billing Service (System Design §2) — deterministic, no AI involvement.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum InvoiceType {
+  deposit
+  milestone
+  final
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+  void
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  engagementId   String
+  engagement     Engagement    @relation(fields: [engagementId], references: [id])
+  type           InvoiceType
+  amountMinor    BigInt
+  currency       String
+  gstApplicable  Boolean       @default(false)
+  gstBreakup     Json? // { cgst, sgst, igst, hsnSac } — jsonb, shape may evolve (System Design §7)
+  status         InvoiceStatus @default(draft)
+  dueDate        DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  payments Payment[]
+
+  @@index([engagementId])
+  @@map("invoices")
+}
+
+enum PaymentMethod {
+  upi
+  card
+  netbanking
+  other
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  invoiceId        String
+  invoice          Invoice       @relation(fields: [invoiceId], references: [id])
+  razorpayPaymentId String       @unique
+  amountMinor      BigInt
+  method           PaymentMethod
+  paidAt           DateTime
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Onboarding Service (System Design §2)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum DraftStatus {
+  draft
+  sent
+}
+
+model WelcomeDoc {
+  id           String      @id @default(cuid())
+  engagementId String
+  engagement   Engagement  @relation(fields: [engagementId], references: [id])
+  content      String
+  status       DraftStatus @default(draft)
+  sentAt       DateTime?
+  createdAt    DateTime    @default(now())
+
+  @@index([engagementId])
+  @@map("welcome_docs")
+}
+
+model IntakeForm {
+  id           String      @id @default(cuid())
+  engagementId String
+  engagement   Engagement  @relation(fields: [engagementId], references: [id])
+  questions    Json // AI-generated, jsonb (System Design §3)
+  status       DraftStatus @default(draft)
+  createdAt    DateTime    @default(now())
+
+  responses IntakeResponse[]
+
+  @@index([engagementId])
+  @@map("intake_forms")
+}
+
+model IntakeResponse {
+  id           String     @id @default(cuid())
+  intakeFormId String
+  intakeForm   IntakeForm @relation(fields: [intakeFormId], references: [id])
+  answers      Json
+  submittedAt  DateTime   @default(now())
+
+  @@index([intakeFormId])
+  @@map("intake_responses")
+}
+
+enum AccessRequestStatus {
+  requested
+  granted
+  na
+}
+
+model AccessRequest {
+  id           String              @id @default(cuid())
+  engagementId String
+  engagement   Engagement          @relation(fields: [engagementId], references: [id])
+  platform     String
+  instructions String // generated, instruction-only or invite-based (System Design §4)
+  status       AccessRequestStatus @default(requested)
+  requestedAt  DateTime            @default(now())
+  grantedAt    DateTime?
+
+  @@index([engagementId])
+  @@map("access_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Kickoff Service (System Design §2)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum KickoffStatus {
+  scheduled
+  done
+  no_show
+  rescheduled
+}
+
+model KickoffCall {
+  id           String        @id @default(cuid())
+  engagementId String
+  engagement   Engagement    @relation(fields: [engagementId], references: [id])
+  scheduledAt  DateTime?
+  agenda       Json? // AI-generated structured agenda (System Design §5)
+  recordingUrl String?
+  status       KickoffStatus @default(scheduled)
+  createdAt    DateTime      @default(now())
+
+  summary CallSummary?
+
+  @@index([engagementId])
+  @@map("kickoff_calls")
+}
+
+model CallSummary {
+  id            String      @id @default(cuid())
+  kickoffCallId String      @unique
+  kickoffCall   KickoffCall @relation(fields: [kickoffCallId], references: [id])
+  summaryText   String
+  actionItems   Json // [{ description, owner: "agency"|"client", done }]
+  createdAt     DateTime    @default(now())
+
+  @@map("call_summaries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Follow-up Engine (System Design §6) — the single most important automation.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum FollowUpTargetType {
+  proposal
+  invoice
+  intake_form
+  access_request
+}
+
+enum FollowUpTaskStatus {
+  pending
+  sent
+  stopped
+}
+
+model FollowUpRule {
+  id             String             @id @default(cuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  targetType     FollowUpTargetType
+  // default: nudge at day 2, 5, 9; stop after 3 unanswered nudges (System Design §6)
+  nudgeDaysAfter Int[]              @default([2, 5, 9])
+  maxNudges      Int                @default(3)
+  createdAt      DateTime           @default(now())
+
+  @@unique([tenantId, targetType])
+  @@map("follow_up_rules")
+}
+
+model FollowUpTask {
+  id           String             @id @default(cuid())
+  engagementId String
+  engagement   Engagement         @relation(fields: [engagementId], references: [id])
+  targetType   FollowUpTargetType
+  targetId     String
+  triggerRule  String? // snapshot of the rule applied, for audit
+  nextRunAt    DateTime
+  attempts     Int                @default(0)
+  status       FollowUpTaskStatus @default(pending)
+  snoozedUntil DateTime?
+  snoozeReason String?
+  createdAt    DateTime           @default(now())
+
+  @@index([engagementId])
+  @@index([status, nextRunAt])
+  @@map("follow_up_tasks")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Feedback Service (System Design §2)
+// ─────────────────────────────────────────────────────────────────────────
+
+model FeedbackRequest {
+  id           String    @id @default(cuid())
+  engagementId String
+  engagement   Engagement @relation(fields: [engagementId], references: [id])
+  sentAt       DateTime  @default(now())
+
+  response FeedbackResponse?
+
+  @@index([engagementId])
+  @@map("feedback_requests")
+}
+
+model FeedbackResponse {
+  id                String          @id @default(cuid())
+  feedbackRequestId String          @unique
+  feedbackRequest   FeedbackRequest @relation(fields: [feedbackRequestId], references: [id])
+  rating            Int
+  comments          String?
+  createdAt         DateTime        @default(now())
+
+  @@map("feedback_responses")
+}
+
+model HandoverPacket {
+  id           String     @id @default(cuid())
+  engagementId String
+  engagement   Engagement @relation(fields: [engagementId], references: [id])
+  deliverables Json // [{ fileName, url }]
+  summary      String // AI-generated (System Design §2)
+  sentAt       DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([engagementId])
+  @@map("handover_packets")
+}
