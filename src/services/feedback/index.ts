@@ -17,6 +17,7 @@ import { sendEmail } from "@/lib/integrations/email";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import type { Prisma } from "@prisma/client";
 import { generatePublicToken } from "@/lib/public-token";
+import { getSignedDownloadUrl } from "@/lib/storage/s3";
 
 async function maybeCloseEngagement(engagementId: string) {
   const engagement = await prisma.engagement.findUniqueOrThrow({ where: { id: engagementId } });
@@ -131,12 +132,29 @@ export async function submitFeedbackResponse(token: string, rating: number, comm
 // Handover packet (PRD §14)
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Stored shape — storageKey is the S3 object key, never exposed directly. */
 export interface Deliverable {
   fileName: string;
+  storageKey: string;
+}
+
+/**
+ * Serialized shape — keeps storageKey (the owner editor round-trips it on
+ * save/remove) alongside a signed, time-boxed download url resolved fresh on
+ * every read. The public handover page (getPublicHandoverPacket) strips
+ * storageKey before returning to an unauthenticated caller.
+ */
+export interface SerializedDeliverable extends Deliverable {
   url: string;
 }
 
-function serializeHandoverPacket(packet: {
+async function serializeDeliverables(deliverables: Deliverable[]): Promise<SerializedDeliverable[]> {
+  return Promise.all(
+    deliverables.map(async (d) => ({ ...d, url: await getSignedDownloadUrl(d.storageKey) })),
+  );
+}
+
+async function serializeHandoverPacket(packet: {
   id: string;
   engagementId: string;
   deliverables: unknown;
@@ -147,7 +165,7 @@ function serializeHandoverPacket(packet: {
   return {
     id: packet.id,
     engagementId: packet.engagementId,
-    deliverables: (packet.deliverables as Deliverable[] | null) ?? [],
+    deliverables: await serializeDeliverables((packet.deliverables as Deliverable[] | null) ?? []),
     summary: packet.summary,
     sentAt: packet.sentAt?.toISOString() ?? null,
     createdAt: packet.createdAt.toISOString(),
@@ -285,8 +303,11 @@ export async function getPublicHandoverPacket(token: string) {
     where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
+  const serialized = await serializeHandoverPacket(packet);
   return {
-    ...serializeHandoverPacket(packet),
+    ...serialized,
+    // storageKey is an internal S3 object key — never expose it to the unauthenticated public page.
+    deliverables: serialized.deliverables.map(({ fileName, url }) => ({ fileName, url })),
     id: packet.publicToken,
     businessName: packet.engagement.tenant.businessName,
     clientName: packet.engagement.client.name,

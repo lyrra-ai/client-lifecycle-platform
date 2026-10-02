@@ -3,13 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// Deliverables carry a signed, time-boxed download url (resolved server-side
+// from the stored storageKey) whenever read back from the API — but what
+// gets PUT/POSTed to save this packet is storageKey, not url (see note on save()).
 export interface Deliverable {
   fileName: string;
-  url: string;
+  storageKey: string;
+  url?: string;
 }
 
 export interface EditorHandoverPacket {
   id: string;
+  engagementId: string;
   deliverables: Deliverable[];
   summary: string;
   sentAt: string | null;
@@ -17,34 +22,47 @@ export interface EditorHandoverPacket {
 
 export function HandoverEditor({ initial }: { initial: EditorHandoverPacket }) {
   const router = useRouter();
-  const [deliverables, setDeliverables] = useState<Deliverable[]>(
-    initial.deliverables.length ? initial.deliverables : [{ fileName: "", url: "" }],
-  );
+  const [deliverables, setDeliverables] = useState<Deliverable[]>(initial.deliverables);
   const [summary, setSummary] = useState(initial.summary);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const isDraft = !initial.sentAt;
 
-  function update(i: number, patch: Partial<Deliverable>) {
-    setDeliverables((ds) => ds.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
-  }
-
-  function addRow() {
-    setDeliverables((ds) => [...ds, { fileName: "", url: "" }]);
-  }
-
   function removeRow(i: number) {
     setDeliverables((ds) => ds.filter((_, idx) => idx !== i));
+  }
+
+  async function uploadFile(file: File) {
+    setBusy(true);
+    setMessage(null);
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/engagements/${initial.engagementId}/handover-packet/upload`, {
+      method: "POST",
+      body: form,
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setMessage(data.error ?? "Upload failed.");
+      return;
+    }
+    setDeliverables((ds) => [...ds, { fileName: data.fileName, storageKey: data.storageKey }]);
   }
 
   async function save() {
     setBusy(true);
     setMessage(null);
+    // storageKey is the stable identity the server stores; url is a signed
+    // link regenerated on every read, so it's never sent back on save.
     const res = await fetch(`/api/handover-packets/${initial.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deliverables: deliverables.filter((d) => d.fileName.trim()), summary }),
+      body: JSON.stringify({
+        deliverables: deliverables.map((d) => ({ fileName: d.fileName, storageKey: d.storageKey })),
+        summary,
+      }),
     });
     const data = await res.json();
     setBusy(false);
@@ -86,25 +104,27 @@ export function HandoverEditor({ initial }: { initial: EditorHandoverPacket }) {
 
       <h3>Deliverables</h3>
       {deliverables.map((d, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <input
-            placeholder="File name"
-            value={d.fileName}
-            onChange={(e) => update(i, { fileName: e.target.value })}
-            disabled={!isDraft}
-            style={{ flex: 1 }}
-          />
-          <input
-            placeholder="URL"
-            value={d.url}
-            onChange={(e) => update(i, { url: e.target.value })}
-            disabled={!isDraft}
-            style={{ flex: 2 }}
-          />
+        <div key={d.storageKey} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+          {d.url ? (
+            <a href={d.url} target="_blank" rel="noreferrer" style={{ flex: 1 }}>{d.fileName}</a>
+          ) : (
+            <span style={{ flex: 1 }}>{d.fileName}</span>
+          )}
           {isDraft && <button onClick={() => removeRow(i)}>Remove</button>}
         </div>
       ))}
-      {isDraft && <button onClick={addRow}>+ Add deliverable</button>}
+      {deliverables.length === 0 && <p>No files uploaded yet.</p>}
+      {isDraft && (
+        <input
+          type="file"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadFile(file);
+            e.target.value = "";
+          }}
+        />
+      )}
 
       {isDraft && (
         <div style={{ marginTop: 16 }}>

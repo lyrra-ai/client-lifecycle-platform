@@ -4,7 +4,7 @@ import { getSession, requireTenantContext } from "@/lib/auth";
 import { updateHandoverPacket } from "@/services/feedback";
 
 const bodySchema = z.object({
-  deliverables: z.array(z.object({ fileName: z.string().trim().min(1), url: z.string().trim().min(1) })),
+  deliverables: z.array(z.object({ fileName: z.string().trim().min(1), storageKey: z.string().trim().min(1) })),
   summary: z.string().trim().min(1),
 });
 

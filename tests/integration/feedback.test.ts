@@ -139,7 +139,7 @@ describe("createHandoverPacket / sendHandoverPacket", () => {
     const engagement = await createEngagement(tenant.id, client.id, "feedback_requested");
     const { createHandoverPacket } = await import("@/services/feedback");
 
-    const first = await createHandoverPacket(ctx, engagement.id, { deliverables: [{ fileName: "site.zip", url: "https://x.test/site.zip" }] });
+    const first = await createHandoverPacket(ctx, engagement.id, { deliverables: [{ fileName: "site.zip", storageKey: "handover/test/site.zip" }] });
     const second = await createHandoverPacket(ctx, engagement.id, { deliverables: [] });
 
     expect(first.summary).toBe("We delivered the full website redesign as scoped.");

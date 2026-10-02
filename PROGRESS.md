@@ -77,21 +77,55 @@ Follow-ups, Client Portal, Feedback & Handover, Dashboard/Engagement List
 - Full regression: `tsc --noEmit` clean, `vitest run` — 173/173 passing.
 - Committed and pushed as `0x12md10`.
 
+## Iteration 16 — Real S3-compatible file storage (Cloudflare R2) — DONE
+
+- Chose **Cloudflare R2** for the MVP: free tier (10 GB storage, 1M Class A /
+  10M Class B ops/month, **zero egress fees**, no 12-month trial clock unlike
+  AWS S3's free tier). Fully S3-compatible API — the wrapper is written
+  against the generic `@aws-sdk/client-s3` interface, so switching to real
+  AWS S3 (or Backblaze, DigitalOcean Spaces, ...) later is an env-var change
+  only (`S3_ENDPOINT`/`S3_REGION`), no code change.
+- `src/lib/storage/s3.ts` — `buildStorageKey`, `uploadObject`,
+  `deleteObject`, `getSignedDownloadUrl` (signed, time-boxed GET url, 24h
+  default TTL). Uses `forcePathStyle: true` — required for R2 and most
+  non-AWS S3-compatible providers (virtual-hosted-style, the SDK default,
+  doesn't resolve against them).
+- `Deliverable` (handover packets) changed from `{ fileName, url }` (a raw
+  URL string the owner typed in) to `{ fileName, storageKey }` stored in the
+  DB; `SerializedDeliverable` (`{ fileName, storageKey, url }`) is resolved
+  at read time with a **fresh signed url on every request** — the owner
+  editor round-trips `storageKey` on save, the public `/handover/[token]`
+  page gets `{ fileName, url }` only (storageKey is stripped — it's an
+  internal object key, not meant to leak to an unauthenticated caller).
+- New owner-only, tenant-scoped upload route:
+  `POST /api/engagements/[id]/handover-packet/upload` (multipart form-data,
+  50 MB cap) — uploads to R2 under
+  `handover/{tenantId}/{engagementId}/{random}-{fileName}` and returns
+  `{ fileName, storageKey }`. `handover-editor.tsx` now has a real file
+  picker (uploads immediately on choose) instead of a free-text URL field.
+- No Prisma migration needed — `deliverables` is already a JSON column.
+- Live-verified directly against real R2 (not mocked): uploaded a real
+  object, generated a signed url, fetched it via `curl`, confirmed the
+  content round-tripped, then deleted it. Credentials are in `.env`
+  (gitignored) — user's own Cloudflare account/bucket (`flowdesk`).
+- Full regression: `tsc --noEmit` clean, `vitest run` — 173/173 passing
+  (presigning is a local HMAC computation in the AWS SDK, no network call,
+  so tests don't hit R2 even with real credentials loaded).
+- **Not yet done:** credential handoff/MVP-to-production switch is deferred
+  — this is explicitly the MVP/free-tier choice; user said to revisit
+  providers once there are real users, no action needed now.
+
 ## Next up, in the user's explicit stated order
 
-1. **Real S3-compatible file storage** (2nd deferred integration; magic-link
-   tokens were 1st and are now done). Needed for `HandoverPacket.deliverables`
-   file URLs and any future file uploads — currently just raw URL strings
-   typed in by the owner, no actual upload/storage path exists yet.
-2. **WhatsApp Business API** (3rd/last deferred integration). User flagged:
+1. **WhatsApp Business API** (3rd/last deferred integration). User flagged:
    expect provider verification lead time — this will likely need the user
    to go create a Business API account/app before it can be wired up, so
    flag that early rather than discovering it mid-iteration.
-3. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
+2. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
    connection UI, configurable templates/question-library seeds.
-4. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
+3. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
    CI pipeline.
-5. Deferred to the very end, only if/when the user asks:
+4. Deferred to the very end, only if/when the user asks:
    - **PRD §16** out-of-scope items.
    - **PRD §17** open questions: product/brand name, follow-up cadence
      tuning (currently PRD's proposed 2/5/9 default), WhatsApp provider
