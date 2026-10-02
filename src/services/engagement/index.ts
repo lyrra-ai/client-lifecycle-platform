@@ -42,6 +42,24 @@ export function listEngagements(ctx: TenantContext) {
   );
 }
 
+/** Dashboard engagement list (PRD §15): current stage at a glance, no need to open each one. */
+export function listEngagementsForDashboard(ctx: TenantContext) {
+  return withTenant(ctx, async (tenantId) => {
+    const engagements = await prisma.engagement.findMany({
+      where: { tenantId },
+      include: { client: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    return engagements.map((e) => ({
+      id: e.id,
+      clientName: e.client.name,
+      stage: e.stage,
+      currency: e.currency,
+      updatedAt: e.updatedAt.toISOString(),
+    }));
+  });
+}
+
 export function getEngagement(ctx: TenantContext, engagementId: string) {
   return withTenant(ctx, (tenantId) =>
     prisma.engagement.findFirstOrThrow({
@@ -130,4 +148,64 @@ export async function setStageManually(
       return updated;
     }),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dashboard activity feed (PRD §15) — merges recent completed actions
+// across entity types rather than a dedicated activity-log table.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ActivityItem {
+  type: "payment" | "proposal_signed" | "intake_submitted";
+  label: string;
+  at: string;
+  engagementId: string;
+}
+
+export async function getRecentActivity(ctx: TenantContext, limit = 10): Promise<ActivityItem[]> {
+  return withTenant(ctx, async (tenantId) => {
+    const [payments, esignEvents, intakeResponses] = await Promise.all([
+      prisma.payment.findMany({
+        where: { invoice: { engagement: { tenantId } } },
+        include: { invoice: { include: { engagement: { include: { client: true } } } } },
+        orderBy: { paidAt: "desc" },
+        take: limit,
+      }),
+      prisma.esignEvent.findMany({
+        where: { proposal: { engagement: { tenantId } }, otpVerifiedAt: { not: null } },
+        include: { proposal: { include: { engagement: { include: { client: true } } } } },
+        orderBy: { otpVerifiedAt: "desc" },
+        take: limit,
+      }),
+      prisma.intakeResponse.findMany({
+        where: { intakeForm: { engagement: { tenantId } } },
+        include: { intakeForm: { include: { engagement: { include: { client: true } } } } },
+        orderBy: { submittedAt: "desc" },
+        take: limit,
+      }),
+    ]);
+
+    const items: ActivityItem[] = [
+      ...payments.map((p) => ({
+        type: "payment" as const,
+        label: `Payment received from ${p.invoice.engagement.client.name} (${p.invoice.currency} ${(Number(p.amountMinor) / 100).toFixed(2)})`,
+        at: p.paidAt.toISOString(),
+        engagementId: p.invoice.engagementId,
+      })),
+      ...esignEvents.map((e) => ({
+        type: "proposal_signed" as const,
+        label: `${e.proposal.engagement.client.name} signed their proposal`,
+        at: e.otpVerifiedAt!.toISOString(),
+        engagementId: e.proposal.engagementId,
+      })),
+      ...intakeResponses.map((r) => ({
+        type: "intake_submitted" as const,
+        label: `${r.intakeForm.engagement.client.name} submitted the intake form`,
+        at: r.submittedAt.toISOString(),
+        engagementId: r.intakeForm.engagementId,
+      })),
+    ];
+
+    return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, limit);
+  });
 }

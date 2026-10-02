@@ -164,6 +164,21 @@ export function listInvoicesForOwner(ctx: TenantContext, engagementId: string) {
   });
 }
 
+/** Dashboard's "how much is owed to me right now" (PRD §15), grouped by currency. */
+export function getOutstandingInvoicesTotal(ctx: TenantContext) {
+  return withTenant(ctx, async (tenantId) => {
+    const unpaid = await prisma.invoice.findMany({
+      where: { engagement: { tenantId }, status: "sent" },
+      select: { amountMinor: true, currency: true },
+    });
+    const totals: Record<string, string> = {};
+    for (const inv of unpaid) {
+      totals[inv.currency] = ((BigInt(totals[inv.currency] ?? "0")) + inv.amountMinor).toString();
+    }
+    return totals;
+  });
+}
+
 export async function getInvoiceForOwner(ctx: TenantContext, invoiceId: string) {
   return withTenant(ctx, async (tenantId) => {
     const invoice = await prisma.invoice.findFirstOrThrow({
