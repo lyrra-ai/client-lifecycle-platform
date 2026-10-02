@@ -20,6 +20,8 @@ model Tenant {
   id               String   @id @default(cuid())
   businessName     String
   gstNumber        String? // nullable — many tenants sit under the ₹20L threshold (System Design §4)
+  state            String? // needed to compare against Client.state for CGST/SGST vs IGST (System Design §4)
+  defaultDepositPercent Int @default(50) // PRD §6: pre-fills the auto-drafted deposit invoice
   defaultCurrency  String   @default("INR")
   razorpayAccountId String?
   createdAt        DateTime @default(now())
@@ -49,9 +51,42 @@ model User {
   role      UserRole @default(owner)
   createdAt DateTime @default(now())
 
+  sessions Session[]
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Auth — Email + OTP login (System Design §4), the same OTP mechanism
+// reused for e-sign (one mechanism, not two). Pre-auth, so not tenant-scoped.
+// ─────────────────────────────────────────────────────────────────────────
+
+model OtpCode {
+  id          String    @id @default(cuid())
+  identifier  String // email (login) or phone (e-sign) — one mechanism, System Design §4
+  code        String // 6-digit code, stored plainly (short-lived, single-use)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([identifier])
+  @@map("otp_codes")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique // opaque random token held in the session cookie
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -80,6 +115,7 @@ model Client {
   email             String?
   phone             String?
   country           String?
+  state             String? // compared against Tenant.state for GST CGST/SGST vs IGST (System Design §4)
   preferredCurrency String   @default("INR")
   createdAt         DateTime @default(now())
 
@@ -188,6 +224,7 @@ model Proposal {
   engagement   Engagement     @relation(fields: [engagementId], references: [id])
   version      Int            @default(1)
   status       ProposalStatus @default(draft)
+  coverNote    String? // AI-draftable, always editable before sending (PRD §4)
   validUntil   DateTime?
   pdfUrl       String?
   createdAt    DateTime       @default(now())
@@ -260,6 +297,7 @@ model Invoice {
   gstApplicable  Boolean       @default(false)
   gstBreakup     Json? // { cgst, sgst, igst, hsnSac } — jsonb, shape may evolve (System Design §7)
   status         InvoiceStatus @default(draft)
+  razorpayOrderId String? @unique // maps a webhook/reconciliation hit back to this invoice; avoids duplicate orders on repeat "Pay Now" clicks
   dueDate        DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -373,6 +411,7 @@ model KickoffCall {
   engagementId String
   engagement   Engagement    @relation(fields: [engagementId], references: [id])
   scheduledAt  DateTime?
+  proposedSlots Json? // candidate ISO datetimes the owner offers; client picks one (PRD §11)
   agenda       Json? // AI-generated structured agenda (System Design §5)
   recordingUrl String?
   status       KickoffStatus @default(scheduled)
@@ -436,6 +475,7 @@ model FollowUpTask {
   nextRunAt    DateTime
   attempts     Int                @default(0)
   status       FollowUpTaskStatus @default(pending)
+  draftMessage String? // pre-drafted by the worker (System Design §6), ready for owner review
   snoozedUntil DateTime?
   snoozeReason String?
   createdAt    DateTime           @default(now())

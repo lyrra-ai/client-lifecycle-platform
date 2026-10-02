@@ -13,6 +13,12 @@ node_modules/
 # Prisma
 prisma/*.db
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # misc
 .DS_Store
 *.log

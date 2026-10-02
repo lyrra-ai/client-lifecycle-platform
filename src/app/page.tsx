@@ -1,8 +1,7 @@
-export default function HomePage() {
-  return (
-    <main>
-      <h1>Client Lifecycle Platform</h1>
-      <p>Lead → Proposal → Contract → Payment → Onboarding → Kickoff → Delivery → Handover.</p>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+
+export default async function HomePage() {
+  const session = await getSession();
+  redirect(session ? "/dashboard" : "/login");
 }

@@ -83,7 +83,9 @@ src/app/
 
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL at minimum
+npx playwright install chromium      # one-time, for the e2e test layer
+docker compose up -d postgres        # local dev database
+cp .env.example .env                 # fill in DATABASE_URL at minimum
 npm run db:migrate
 npm run dev
 ```
@@ -93,6 +95,62 @@ Run the job-queue worker separately during development:
 ```bash
 npm run worker
 ```
+
+## Testing
+
+Every iteration's acceptance criteria get a test as part of being "done,"
+not as a follow-up — this section is the standing contract for that.
+
+**Layers:**
+
+| Layer | Tool | Scope | Status |
+| --- | --- | --- | --- |
+| Unit | Vitest (`tests/unit/`) | Pure functions with no DB/network — money math (`src/services/proposal`'s `toMinorUnits`/`lineTotalMinor`/`computeTotals`), the `Engagement.stage` transition map, anything else that doesn't need I/O to prove correct. | Active |
+| Integration | Vitest (`tests/integration/`) | Service-layer functions (`src/services/**`) against a real Postgres (`docker-compose`'s `postgres-test`, port 55433) — tenant isolation, state-machine guards, dedup logic, the full draft -> send -> decline -> re-version lifecycle. External providers (Anthropic, Razorpay, WhatsApp/email) are mocked at the `AIGateway`/integration-module boundary, never hit for real. | Active |
+| End-to-end | Playwright (`tests/e2e/`) | Real browser against the real dev server and dev DB, for flows the Vitest layers can't reach — third-party UI we don't control (Razorpay's hosted Checkout.js) and genuine multi-step client-side JS. Specs seed their own data directly via the service layer (`tests/e2e/seed.ts`) and clean up after themselves. Kept to a handful of high-value golden paths, not broad coverage — that stays at the integration layer. | Active |
+
+**Running tests:**
+
+```bash
+docker compose up -d postgres-test   # one-time per machine restart
+npm test                             # runs the full unit + integration suite once
+npm run test:watch                   # watch mode while iterating
+
+docker compose up -d postgres        # e2e needs the real dev DB running
+npm run dev                          # and the real dev server, in another terminal
+npm run test:e2e                     # drives a real headless browser against it
+```
+
+`tests/setup/global-setup.ts` applies every Prisma migration to the test
+database once per run; `tests/setup/reset-db.ts` truncates every app table
+before each test for isolation. Test files run serially
+(`fileParallelism: false` in `vitest.config.ts`) because they share that one
+physical database — parallel files would truncate out from under each other.
+
+**Conventions:**
+
+- New service-layer logic gets an integration test in the matching
+  `tests/integration/<service>.test.ts` file; use `tests/helpers/factories.ts`
+  to seed a tenant/client/engagement rather than hand-rolling Prisma calls
+  in each test.
+- Pure, DB-free logic worth isolating (currency math, state machines, parsers)
+  gets exported from its module specifically so a unit test can hit it
+  directly — see the `// Exported for ... unit testing` comments in
+  `src/services/proposal/index.ts` and `src/services/engagement/index.ts`
+  for the pattern.
+- An acceptance criterion from the PRD gets a test named after it in plain
+  English (see existing `it(...)` descriptions) — a failing test should read
+  like the broken promise, not like an assertion dump.
+- **When a UI feature's own pages are the thing worth testing** (not just
+  the service call behind them) — especially third-party UI we don't
+  control, like Razorpay Checkout — add a spec under `tests/e2e/`. Keep e2e
+  specs few and high-value (golden-path flows a real client/owner takes);
+  they're slower and more selector-fragile than the Vitest layers, so the
+  bulk of coverage should stay at the integration layer. `tests/e2e/payment.spec.ts`
+  is the reference pattern, including hard-won notes on Razorpay's test-mode
+  quirks (iframe-scoped locators, which test card/OTP values actually work,
+  dismissing the "save card" dialogs) so the next spec doesn't have to
+  rediscover them.
 
 ## Status
 

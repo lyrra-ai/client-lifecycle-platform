@@ -1,19 +1,23 @@
 /**
- * Owner dashboard (PRD §15) — "what needs my attention today" without
- * opening any individual engagement:
- *   - "Needs Follow-up" list (§12), surfaced first
- *   - Engagement list, sortable/filterable by stage
- *   - Outstanding invoices total across all engagements
- *   - Recently completed actions activity feed
- *
- * Scaffold placeholder — wire to services/followup, services/engagement,
- * services/billing once auth/session is implemented.
+ * Owner dashboard (PRD §15) — "Needs Follow-up" is the single most
+ * important widget, surfaced first (PRD §12). Engagement list / outstanding
+ * invoices total / activity feed are later additions to this page.
  */
-export default function DashboardPage() {
+import { getSession, requireTenantContext } from "@/lib/auth";
+import { listFollowUpTasksForOwner } from "@/services/followup";
+import { FollowupList } from "./followup-list";
+
+export default async function DashboardPage() {
+  const session = await getSession();
+  if (!session) return null;
+
+  const tasks = await listFollowUpTasksForOwner(requireTenantContext(session));
+
   return (
-    <main>
+    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
       <h1>Dashboard</h1>
-      <p>Needs Follow-up, Engagements, Outstanding Invoices — scaffold placeholder.</p>
+      <h2>Needs Follow-up</h2>
+      <FollowupList tasks={tasks} />
     </main>
   );
 }

@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: clp
+      POSTGRES_PASSWORD: clp
+      POSTGRES_DB: client_lifecycle_platform
+    ports:
+      - "55432:5432"
+    volumes:
+      - clp_postgres_data:/var/lib/postgresql/data
+
+  # Separate instance for the Vitest integration suite (tests/) so running
+  # tests never touches dev data, and tests can freely truncate between runs.
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: clp
+      POSTGRES_PASSWORD: clp
+      POSTGRES_DB: client_lifecycle_platform_test
+    ports:
+      - "55433:5432"
+    volumes:
+      - clp_postgres_test_data:/var/lib/postgresql/data
+
+volumes:
+  clp_postgres_data:
+  clp_postgres_test_data:

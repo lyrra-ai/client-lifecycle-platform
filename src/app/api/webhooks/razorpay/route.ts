@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/integrations/razorpay";
+import { recordPaymentFromRazorpay } from "@/services/billing";
 
 /**
  * Razorpay webhook — the single source of truth that a payment happened
@@ -22,11 +23,19 @@ export async function POST(req: NextRequest) {
 
   const event = JSON.parse(rawBody);
 
-  // TODO: look up Payment by razorpayPaymentId (idempotency key) before
-  // creating — a redelivered event must be a no-op, not a duplicate record.
-  // TODO: on payment.captured, call services/billing to mark the Invoice
-  // paid and services/engagement.advanceStageAutomatically(...).
-  console.log("razorpay webhook event received", event?.event);
+  if (event.event === "payment.captured") {
+    const entity = event.payload.payment.entity;
+    await recordPaymentFromRazorpay({
+      id: entity.id,
+      order_id: entity.order_id,
+      amount: entity.amount,
+      method: entity.method,
+      created_at: entity.created_at,
+      status: entity.status,
+    });
+  }
+  // Any other event type is a no-op here, by design — acknowledged so
+  // Razorpay doesn't retry it as if it were dropped.
 
   return NextResponse.json({ received: true });
 }

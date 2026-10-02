@@ -17,7 +17,9 @@ import type { EngagementStage } from "@prisma/client";
 // its triggering event. The job/webhook handler that fires an automatic
 // transition must name itself honestly here; nothing moves "paid" on a
 // client-side click.
-const AUTOMATIC_NEXT_STAGE: Partial<Record<EngagementStage, EngagementStage>> = {
+// Exported for a pure unit test asserting the full chain matches PRD §2's
+// lifecycle order exactly (tests/unit/engagement-stages.test.ts).
+export const AUTOMATIC_NEXT_STAGE: Partial<Record<EngagementStage, EngagementStage>> = {
   lead: "proposal_sent",
   proposal_sent: "proposal_accepted",
   proposal_accepted: "deposit_invoiced",
