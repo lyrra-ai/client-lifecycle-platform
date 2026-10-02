@@ -28,9 +28,9 @@ export interface PortalTodoItem {
   href: string;
 }
 
-export async function getPortalData(engagementId: string) {
+export async function getPortalData(token: string) {
   const engagement = await prisma.engagement.findUniqueOrThrow({
-    where: { id: engagementId },
+    where: { publicToken: token },
     include: {
       client: true,
       tenant: true,
@@ -50,22 +50,22 @@ export async function getPortalData(engagementId: string) {
 
   const todo: PortalTodoItem[] = [];
   if (latestProposal && (latestProposal.status === "sent" || latestProposal.status === "viewed")) {
-    todo.push({ label: "Review and sign your proposal", href: `/p/${latestProposal.id}` });
+    todo.push({ label: "Review and sign your proposal", href: `/p/${latestProposal.publicToken}` });
   }
   for (const invoice of engagement.invoices) {
     if (invoice.status === "sent") {
-      todo.push({ label: `Pay invoice (${invoice.currency} ${(Number(invoice.amountMinor) / 100).toFixed(2)})`, href: `/i/${invoice.id}` });
+      todo.push({ label: `Pay invoice (${invoice.currency} ${(Number(invoice.amountMinor) / 100).toFixed(2)})`, href: `/i/${invoice.publicToken}` });
     }
   }
   if (intakeForm && intakeForm.status === "sent" && intakeForm.responses.length === 0) {
-    todo.push({ label: "Fill out the intake form", href: `/intake/${intakeForm.id}` });
+    todo.push({ label: "Fill out the intake form", href: `/intake/${intakeForm.publicToken}` });
   }
   const openAccessRequests = engagement.accessRequests.filter((r) => r.status === "requested");
   if (openAccessRequests.length > 0) {
-    todo.push({ label: `Grant access to ${openAccessRequests.length} platform(s)`, href: `/access/${engagementId}` });
+    todo.push({ label: `Grant access to ${openAccessRequests.length} platform(s)`, href: `/access/${engagement.publicToken}` });
   }
   if (kickoffCall && !kickoffCall.scheduledAt && kickoffCall.status === "scheduled") {
-    todo.push({ label: "Pick a kickoff call time", href: `/kickoff/${kickoffCall.id}` });
+    todo.push({ label: "Pick a kickoff call time", href: `/kickoff/${kickoffCall.publicToken}` });
   }
 
   return {
@@ -75,33 +75,33 @@ export async function getPortalData(engagementId: string) {
     timeline: fullStageOrder(),
     todo,
     proposal: latestProposal
-      ? { id: latestProposal.id, version: latestProposal.version, status: latestProposal.status, href: `/p/${latestProposal.id}` }
+      ? { id: latestProposal.publicToken, version: latestProposal.version, status: latestProposal.status, href: `/p/${latestProposal.publicToken}` }
       : null,
     invoices: engagement.invoices.map((i) => ({
-      id: i.id,
+      id: i.publicToken,
       type: i.type,
       amount: Number(i.amountMinor) / 100,
       currency: i.currency,
       status: i.status,
-      href: `/i/${i.id}`,
+      href: `/i/${i.publicToken}`,
     })),
-    welcomeDoc: welcomeDoc && welcomeDoc.status === "sent" ? { id: welcomeDoc.id, href: `/w/${welcomeDoc.id}` } : null,
+    welcomeDoc: welcomeDoc && welcomeDoc.status === "sent" ? { id: welcomeDoc.publicToken, href: `/w/${welcomeDoc.publicToken}` } : null,
     intakeForm:
       intakeForm && intakeForm.status === "sent"
-        ? { id: intakeForm.id, href: `/intake/${intakeForm.id}`, submitted: intakeForm.responses.length > 0 }
+        ? { id: intakeForm.publicToken, href: `/intake/${intakeForm.publicToken}`, submitted: intakeForm.responses.length > 0 }
         : null,
     accessRequests:
       engagement.accessRequests.length > 0
         ? {
-            href: `/access/${engagementId}`,
+            href: `/access/${engagement.publicToken}`,
             granted: engagement.accessRequests.filter((r) => r.status === "granted").length,
             total: engagement.accessRequests.length,
           }
         : null,
     kickoffCall: kickoffCall
       ? {
-          id: kickoffCall.id,
-          href: `/kickoff/${kickoffCall.id}`,
+          id: kickoffCall.publicToken,
+          href: `/kickoff/${kickoffCall.publicToken}`,
           status: kickoffCall.status,
           scheduledAt: kickoffCall.scheduledAt?.toISOString() ?? null,
           hasSummary: Boolean(kickoffCall.summary),

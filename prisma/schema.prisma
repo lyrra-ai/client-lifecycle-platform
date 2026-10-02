@@ -169,6 +169,7 @@ model Engagement {
   lead      Lead?           @relation(fields: [leadId], references: [id])
   stage     EngagementStage @default(lead)
   currency  String          @default("INR")
+  publicToken String        @unique // portal (/portal) and access-checklist (/access) links — never the raw id
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
@@ -227,6 +228,7 @@ model Proposal {
   coverNote    String? // AI-draftable, always editable before sending (PRD §4)
   validUntil   DateTime?
   pdfUrl       String?
+  publicToken  String         @unique // /p/[publicToken] — never the raw id
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -298,6 +300,7 @@ model Invoice {
   gstBreakup     Json? // { cgst, sgst, igst, hsnSac } — jsonb, shape may evolve (System Design §7)
   status         InvoiceStatus @default(draft)
   razorpayOrderId String? @unique // maps a webhook/reconciliation hit back to this invoice; avoids duplicate orders on repeat "Pay Now" clicks
+  publicToken    String        @unique // /i/[publicToken] and /pay/[publicToken] — never the raw id
   dueDate        DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -343,6 +346,7 @@ model WelcomeDoc {
   engagement   Engagement  @relation(fields: [engagementId], references: [id])
   content      String
   status       DraftStatus @default(draft)
+  publicToken  String      @unique // /w/[publicToken] — never the raw id
   sentAt       DateTime?
   createdAt    DateTime    @default(now())
 
@@ -356,6 +360,7 @@ model IntakeForm {
   engagement   Engagement  @relation(fields: [engagementId], references: [id])
   questions    Json // AI-generated, jsonb (System Design §3)
   status       DraftStatus @default(draft)
+  publicToken  String      @unique // /intake/[publicToken] — never the raw id
   createdAt    DateTime    @default(now())
 
   responses IntakeResponse[]
@@ -415,6 +420,7 @@ model KickoffCall {
   agenda       Json? // AI-generated structured agenda (System Design §5)
   recordingUrl String?
   status       KickoffStatus @default(scheduled)
+  publicToken  String        @unique // /kickoff/[publicToken] — never the raw id
   createdAt    DateTime      @default(now())
 
   summary CallSummary?
@@ -494,6 +500,7 @@ model FeedbackRequest {
   id           String    @id @default(cuid())
   engagementId String
   engagement   Engagement @relation(fields: [engagementId], references: [id])
+  publicToken  String    @unique // /feedback/[publicToken] — never the raw id
   sentAt       DateTime  @default(now())
 
   response FeedbackResponse?
@@ -519,6 +526,7 @@ model HandoverPacket {
   engagement   Engagement @relation(fields: [engagementId], references: [id])
   deliverables Json // [{ fileName, url }]
   summary      String // AI-generated (System Design §2)
+  publicToken  String     @unique // /handover/[publicToken] — never the raw id
   sentAt       DateTime?
   createdAt    DateTime   @default(now())
 

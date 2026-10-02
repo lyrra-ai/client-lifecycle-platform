@@ -12,6 +12,7 @@
 import { prisma } from "@/lib/db";
 import { TenantContext, withTenant } from "@/lib/tenant";
 import type { LeadSource, LeadStatus } from "@prisma/client";
+import { generatePublicToken } from "@/lib/public-token";
 
 export interface CaptureLeadInput {
   name: string;
@@ -142,6 +143,7 @@ export async function createEngagementFromLead(ctx: TenantContext, leadId: strin
         clientId: lead.clientId!,
         leadId: lead.id,
         currency: lead.client?.preferredCurrency ?? tenant.defaultCurrency,
+        publicToken: generatePublicToken(),
       },
     });
   });

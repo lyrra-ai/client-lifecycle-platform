@@ -27,7 +27,7 @@ async function createAcceptedEngagement(tenantOverrides = {}, clientOverrides = 
   });
   // Push it through sent -> viewed -> accepted directly (esign itself is tested elsewhere).
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "sent" } });
-  await getPublicProposal(draft.id);
+  await getPublicProposal(draft.publicToken);
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "accepted" } });
 
   return { ctx, tenant, client, engagement, proposalId: draft.id };
@@ -200,7 +200,7 @@ describe("getPublicInvoice", () => {
     const [invoice] = await autoCreateDepositInvoices(ctx, engagement.id);
     await sendInvoice(ctx, invoice!.id);
 
-    const publicView = await getPublicInvoice(invoice!.id);
+    const publicView = await getPublicInvoice(invoice!.publicToken);
 
     expect(publicView.status).toBe("sent");
     expect(publicView.amount).toBeGreaterThan(0);

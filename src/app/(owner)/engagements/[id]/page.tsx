@@ -41,7 +41,7 @@ export default async function EngagementDetailPage({
       <p>stage: {engagement.stage}</p>
       <p>currency: {engagement.currency}</p>
       <p>
-        <a href={`/portal/${engagement.id}`}>Client portal link</a>
+        <a href={`/portal/${engagement.publicToken}`}>Client portal link</a>
       </p>
       <OpenProposalButton engagementId={engagement.id} />
       <InvoiceList engagementId={engagement.id} invoices={invoices} />
@@ -57,6 +57,7 @@ export default async function EngagementDetailPage({
       )}
       <AccessRequestList
         engagementId={engagement.id}
+        engagementPublicToken={engagement.publicToken}
         platformLibrary={PLATFORM_LIBRARY.map((p) => p.name)}
         requests={accessRequests}
       />

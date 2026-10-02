@@ -141,7 +141,7 @@ describe("getPublicAccessChecklist", () => {
     const { createAccessRequests, getPublicAccessChecklist } = await import("@/services/onboarding");
     await createAccessRequests(ctx, engagement.id, ["Google Analytics", "Shopify"]);
 
-    const checklist = await getPublicAccessChecklist(engagement.id);
+    const checklist = await getPublicAccessChecklist(engagement.publicToken);
 
     expect(checklist.businessName).toBe("Checklist Co");
     expect(checklist.clientName).toBe("Checklist Client");

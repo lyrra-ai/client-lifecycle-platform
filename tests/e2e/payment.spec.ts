@@ -43,7 +43,7 @@ test("real Razorpay Checkout completes and the invoice is confirmed paid via rec
   const seeded = await seedSentInvoiceWithRealOrder(50);
   tenantId = seeded.tenantId;
 
-  await page.goto(`/pay/${seeded.invoiceId}`);
+  await page.goto(`/pay/${seeded.invoicePublicToken}`);
   await page.getByRole("button", { name: /Pay/ }).click();
 
   const rzp = page.frameLocator('iframe[src*="api.razorpay.com"]');

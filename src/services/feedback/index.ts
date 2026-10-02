@@ -16,6 +16,7 @@ import { advanceStageAutomatically } from "@/services/engagement";
 import { sendEmail } from "@/lib/integrations/email";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import type { Prisma } from "@prisma/client";
+import { generatePublicToken } from "@/lib/public-token";
 
 async function maybeCloseEngagement(engagementId: string) {
   const engagement = await prisma.engagement.findUniqueOrThrow({ where: { id: engagementId } });
@@ -40,7 +41,7 @@ export async function createFeedbackRequest(ctx: TenantContext, engagementId: st
       include: { client: true },
     });
 
-    const request = await prisma.feedbackRequest.create({ data: { engagementId } });
+    const request = await prisma.feedbackRequest.create({ data: { engagementId, publicToken: generatePublicToken() } });
 
     // First request on this engagement advances the stage; a later one
     // (per-milestone retainer use) is a legitimate repeat, not an error.
@@ -50,7 +51,7 @@ export async function createFeedbackRequest(ctx: TenantContext, engagementId: st
 
     await createFollowUpTask(tenantId, engagementId, "feedback_request", request.id);
 
-    const publicUrl = `/feedback/${request.id}`;
+    const publicUrl = `/feedback/${request.publicToken}`;
     let emailed = false;
     const clientEmail = engagement.client.email;
     if (clientEmail) {
@@ -71,7 +72,7 @@ export async function createFeedbackRequest(ctx: TenantContext, engagementId: st
       }
     }
 
-    return { requestId: request.id, publicUrl, emailed };
+    return { requestId: request.id, requestToken: request.publicToken, publicUrl, emailed };
   });
 }
 
@@ -91,22 +92,22 @@ export async function listFeedbackRequestsForEngagement(ctx: TenantContext, enga
   });
 }
 
-export async function getPublicFeedbackRequest(requestId: string) {
+export async function getPublicFeedbackRequest(token: string) {
   const request = await prisma.feedbackRequest.findUniqueOrThrow({
-    where: { id: requestId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } }, response: true },
   });
   return {
-    id: request.id,
+    id: request.publicToken,
     businessName: request.engagement.tenant.businessName,
     clientName: request.engagement.client.name,
     alreadySubmitted: Boolean(request.response),
   };
 }
 
-export async function submitFeedbackResponse(requestId: string, rating: number, comments?: string) {
+export async function submitFeedbackResponse(token: string, rating: number, comments?: string) {
   const request = await prisma.feedbackRequest.findUniqueOrThrow({
-    where: { id: requestId },
+    where: { publicToken: token },
     include: { response: true },
   });
   if (request.response) {
@@ -117,10 +118,10 @@ export async function submitFeedbackResponse(requestId: string, rating: number, 
   }
 
   const response = await prisma.feedbackResponse.create({
-    data: { feedbackRequestId: requestId, rating, comments },
+    data: { feedbackRequestId: request.id, rating, comments },
   });
 
-  await cancelFollowUpTask("feedback_request", requestId);
+  await cancelFollowUpTask("feedback_request", request.id);
   await maybeCloseEngagement(request.engagementId);
 
   return { id: response.id };
@@ -188,6 +189,7 @@ export async function createHandoverPacket(
         engagementId,
         deliverables: input.deliverables as unknown as Prisma.InputJsonValue,
         summary,
+        publicToken: generatePublicToken(),
       },
     });
     return serializeHandoverPacket(packet);
@@ -253,7 +255,7 @@ export async function sendHandoverPacket(ctx: TenantContext, packetId: string) {
     }
     await maybeCloseEngagement(packet.engagementId);
 
-    const publicUrl = `/handover/${packetId}`;
+    const publicUrl = `/handover/${packet.publicToken}`;
     let emailed = false;
     const clientEmail = packet.engagement.client.email;
     if (clientEmail) {
@@ -278,13 +280,14 @@ export async function sendHandoverPacket(ctx: TenantContext, packetId: string) {
   });
 }
 
-export async function getPublicHandoverPacket(packetId: string) {
+export async function getPublicHandoverPacket(token: string) {
   const packet = await prisma.handoverPacket.findUniqueOrThrow({
-    where: { id: packetId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
   return {
     ...serializeHandoverPacket(packet),
+    id: packet.publicToken,
     businessName: packet.engagement.tenant.businessName,
     clientName: packet.engagement.client.name,
   };

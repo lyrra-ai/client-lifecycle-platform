@@ -8,6 +8,7 @@ import { prisma } from "../../src/lib/db";
 import { TenantContext } from "../../src/lib/tenant";
 import { getOrCreateDraftProposal, updateDraftProposal, getPublicProposal } from "../../src/services/proposal";
 import { autoCreateDepositInvoices, sendInvoice, createRazorpayOrderForInvoice } from "../../src/services/billing";
+import { generatePublicToken } from "../../src/lib/public-token";
 
 export async function seedSentInvoiceWithRealOrder(amountMajor = 50) {
   const tenant = await prisma.tenant.create({ data: { businessName: "Playwright E2E Co" } });
@@ -16,7 +17,7 @@ export async function seedSentInvoiceWithRealOrder(amountMajor = 50) {
     data: { tenantId: tenant.id, name: "Playwright Client", email: "playwright-e2e@example.com" },
   });
   const engagement = await prisma.engagement.create({
-    data: { tenantId: tenant.id, clientId: client.id, stage: "proposal_accepted" },
+    data: { tenantId: tenant.id, clientId: client.id, stage: "proposal_accepted", publicToken: generatePublicToken() },
   });
 
   const draft = await getOrCreateDraftProposal(ctx, engagement.id);
@@ -24,14 +25,14 @@ export async function seedSentInvoiceWithRealOrder(amountMajor = 50) {
     lineItems: [{ description: "E2E test item", qty: 1, unitPrice: amountMajor, currency: "INR" }],
   });
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "sent" } });
-  await getPublicProposal(draft.id);
+  await getPublicProposal(draft.publicToken);
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "accepted" } });
 
   const [invoice] = await autoCreateDepositInvoices(ctx, engagement.id);
   await sendInvoice(ctx, invoice!.id);
-  const order = await createRazorpayOrderForInvoice(invoice!.id);
+  const order = await createRazorpayOrderForInvoice(invoice!.publicToken);
 
-  return { tenantId: tenant.id, engagementId: engagement.id, invoiceId: invoice!.id, order };
+  return { tenantId: tenant.id, engagementId: engagement.id, invoiceId: invoice!.id, invoicePublicToken: invoice!.publicToken, order };
 }
 
 export async function cleanupTenant(tenantId: string) {

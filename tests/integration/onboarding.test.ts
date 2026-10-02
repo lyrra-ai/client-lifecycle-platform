@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTenant, createClient, createEngagement } from "../helpers/factories";
 import { prisma } from "@/lib/db";
+import { generatePublicToken } from "@/lib/public-token";
 
 vi.mock("@/lib/ai-gateway", () => ({
   AIGateway: { generate: vi.fn() },
@@ -15,7 +16,7 @@ async function createEngagementWithAcceptedProposal(coverNote = "A 3-page websit
   const client = await createClient(tenant.id, { name: "Dev Patel" });
   const engagement = await createEngagement(tenant.id, client.id, "deposit_paid");
   const proposal = await prisma.proposal.create({
-    data: { engagementId: engagement.id, status: "accepted", coverNote },
+    data: { engagementId: engagement.id, status: "accepted", coverNote, publicToken: generatePublicToken() },
   });
   return { ctx, tenant, client, engagement, proposal };
 }
@@ -112,7 +113,7 @@ describe("updateDraftWelcomeDoc / sendWelcomeDoc", () => {
 
     const result = await sendWelcomeDoc(ctx, doc.id);
 
-    expect(result.publicUrl).toBe(`/w/${doc.id}`);
+    expect(result.publicUrl).toBe(`/w/${doc.publicToken}`);
     const updated = await getEngagement(ctx, engagement.id);
     expect(updated.stage).toBe("onboarding");
   });

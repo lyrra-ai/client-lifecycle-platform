@@ -7,7 +7,10 @@
  *
  * Public (no-login) functions, same pattern as the rest of this service's
  * public surface — a TenantContext is constructed from the proposal's
- * already-known tenantId, not from a session.
+ * already-known tenantId, not from a session. `token` throughout this
+ * file is Proposal.publicToken, never the raw id — every function
+ * resolves it to the real row first, then uses the real id for every
+ * internal write (EsignEvent, FollowUpTask, stage transitions, etc.).
  */
 import { prisma } from "@/lib/db";
 import { TenantContext } from "@/lib/tenant";
@@ -17,14 +20,14 @@ import { advanceStageAutomatically } from "@/services/engagement";
 import { autoCreateDepositInvoices } from "@/services/billing";
 import { cancelFollowUpTask } from "@/services/followup";
 
-export async function getEsignContext(proposalId: string) {
+export async function getEsignContext(token: string) {
   const proposal = await prisma.proposal.findUniqueOrThrow({
-    where: { id: proposalId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true } } },
   });
 
   return {
-    proposalId: proposal.id,
+    proposalId: proposal.publicToken,
     status: proposal.status,
     signable: proposal.status === "viewed",
     clientName: proposal.engagement.client.name,
@@ -38,10 +41,10 @@ export type RequestEsignOtpResult =
   | { ok: false; reason: "cooldown"; retryAfterSeconds: number };
 
 export async function requestEsignOtp(
-  proposalId: string,
+  token: string,
   signerPhone: string,
 ): Promise<RequestEsignOtpResult> {
-  const proposal = await prisma.proposal.findUniqueOrThrow({ where: { id: proposalId } });
+  const proposal = await prisma.proposal.findUniqueOrThrow({ where: { publicToken: token } });
   if (proposal.status !== "viewed") {
     return { ok: false, reason: "not_signable" };
   }
@@ -80,7 +83,7 @@ export type VerifyEsignOtpResult =
  * than login's 5.
  */
 export async function verifyEsignOtp(
-  proposalId: string,
+  token: string,
   signerName: string,
   signerPhone: string,
   code: string,
@@ -90,7 +93,7 @@ export async function verifyEsignOtp(
   if (!otpResult.ok) return otpResult;
 
   const proposal = await prisma.proposal.findUniqueOrThrow({
-    where: { id: proposalId },
+    where: { publicToken: token },
     include: { engagement: true },
   });
   if (proposal.status !== "viewed") {
@@ -100,19 +103,19 @@ export async function verifyEsignOtp(
   const esignEvent = await prisma.$transaction(async (tx) => {
     const event = await tx.esignEvent.create({
       data: {
-        proposalId,
+        proposalId: proposal.id,
         signerName,
         signerPhone,
         otpVerifiedAt: new Date(),
         ipAddress,
       },
     });
-    await tx.proposal.update({ where: { id: proposalId }, data: { status: "accepted" } });
+    await tx.proposal.update({ where: { id: proposal.id }, data: { status: "accepted" } });
     return event;
   });
 
   // PRD §12: a signed proposal is resolved, not something to keep nudging.
-  await cancelFollowUpTask("proposal", proposalId);
+  await cancelFollowUpTask("proposal", proposal.id);
 
   if (proposal.engagement.stage === "proposal_sent") {
     await advanceStageAutomatically(

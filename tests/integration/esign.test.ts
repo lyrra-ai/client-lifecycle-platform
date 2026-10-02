@@ -15,9 +15,9 @@ async function createSignableProposal() {
     lineItems: [{ description: "Design", qty: 1, unitPrice: 500, currency: "USD" }],
   });
   await sendProposal(ctx, draft.id);
-  await getPublicProposal(draft.id); // flips sent -> viewed
+  await getPublicProposal(draft.publicToken); // flips sent -> viewed
 
-  return { ctx, tenant, client, engagement, proposalId: draft.id };
+  return { ctx, tenant, client, engagement, proposalId: draft.id, proposalToken: draft.publicToken };
 }
 
 async function latestCodeFor(identifier: string): Promise<string> {
@@ -27,9 +27,9 @@ async function latestCodeFor(identifier: string): Promise<string> {
 
 describe("getEsignContext", () => {
   it("is signable once the proposal has been viewed, prefilled from the Client record", async () => {
-    const { proposalId } = await createSignableProposal();
+    const { proposalToken } = await createSignableProposal();
 
-    const context = await getEsignContext(proposalId);
+    const context = await getEsignContext(proposalToken);
 
     expect(context.signable).toBe(true);
     expect(context.clientName).toBe("Anita Rao");
@@ -42,7 +42,7 @@ describe("getEsignContext", () => {
     const engagement = await createEngagement(tenant.id, client.id, "lead");
     const draft = await getOrCreateDraftProposal(ctx, engagement.id);
 
-    const context = await getEsignContext(draft.id);
+    const context = await getEsignContext(draft.publicToken);
 
     expect(context.signable).toBe(false);
   });
@@ -55,16 +55,16 @@ describe("requestEsignOtp", () => {
     const engagement = await createEngagement(tenant.id, client.id, "lead");
     const draft = await getOrCreateDraftProposal(ctx, engagement.id);
 
-    const result = await requestEsignOtp(draft.id, "+919876543210");
+    const result = await requestEsignOtp(draft.publicToken, "+919876543210");
 
     expect(result).toEqual({ ok: false, reason: "not_signable" });
   });
 
   it("enforces the resend cooldown on a second immediate request (PRD §5)", async () => {
-    const { proposalId } = await createSignableProposal();
-    await requestEsignOtp(proposalId, "+919876543210");
+    const { proposalToken } = await createSignableProposal();
+    await requestEsignOtp(proposalToken, "+919876543210");
 
-    const second = await requestEsignOtp(proposalId, "+919876543210");
+    const second = await requestEsignOtp(proposalToken, "+919876543210");
 
     expect(second.ok).toBe(false);
     if (!second.ok) expect(second.reason).toBe("cooldown");
@@ -73,11 +73,11 @@ describe("requestEsignOtp", () => {
 
 describe("verifyEsignOtp", () => {
   it("creates an immutable EsignEvent, accepts the proposal, and advances the engagement (System Design §3.1)", async () => {
-    const { proposalId, engagement, ctx } = await createSignableProposal();
-    await requestEsignOtp(proposalId, "+919876543210");
+    const { proposalId, proposalToken, engagement, ctx } = await createSignableProposal();
+    await requestEsignOtp(proposalToken, "+919876543210");
     const code = await latestCodeFor("+919876543210");
 
-    const result = await verifyEsignOtp(proposalId, "Anita Rao", "+919876543210", code, "203.0.113.5");
+    const result = await verifyEsignOtp(proposalToken, "Anita Rao", "+919876543210", code, "203.0.113.5");
 
     expect(result.ok).toBe(true);
 
@@ -94,26 +94,26 @@ describe("verifyEsignOtp", () => {
   });
 
   it("locks out after 3 incorrect attempts (stricter than login's 5, PRD §5)", async () => {
-    const { proposalId } = await createSignableProposal();
-    await requestEsignOtp(proposalId, "+919876543210");
+    const { proposalToken } = await createSignableProposal();
+    await requestEsignOtp(proposalToken, "+919876543210");
     const code = await latestCodeFor("+919876543210");
 
     for (let i = 0; i < 3; i++) {
-      await verifyEsignOtp(proposalId, "Anita Rao", "+919876543210", "000000", null);
+      await verifyEsignOtp(proposalToken, "Anita Rao", "+919876543210", "000000", null);
     }
 
-    const result = await verifyEsignOtp(proposalId, "Anita Rao", "+919876543210", code, null);
+    const result = await verifyEsignOtp(proposalToken, "Anita Rao", "+919876543210", code, null);
 
     expect(result).toEqual({ ok: false, reason: "too_many_attempts" });
   });
 
   it("refuses to sign a proposal that is no longer viewable (e.g. already accepted)", async () => {
-    const { proposalId } = await createSignableProposal();
-    await requestEsignOtp(proposalId, "+919876543210");
+    const { proposalToken } = await createSignableProposal();
+    await requestEsignOtp(proposalToken, "+919876543210");
     const code = await latestCodeFor("+919876543210");
-    await verifyEsignOtp(proposalId, "Anita Rao", "+919876543210", code, null);
+    await verifyEsignOtp(proposalToken, "Anita Rao", "+919876543210", code, null);
 
-    const result = await requestEsignOtp(proposalId, "+919876543210");
+    const result = await requestEsignOtp(proposalToken, "+919876543210");
 
     expect(result).toEqual({ ok: false, reason: "not_signable" });
   });

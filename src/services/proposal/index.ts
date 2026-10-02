@@ -17,6 +17,7 @@ import { Prisma, type ProposalStatus } from "@prisma/client";
 import { z } from "zod";
 import { sendEmail } from "@/lib/integrations/email";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
+import { generatePublicToken } from "@/lib/public-token";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -95,7 +96,7 @@ export async function getOrCreateDraftProposal(ctx: TenantContext, engagementId:
 
     if (!latest) {
       return prisma.proposal.create({
-        data: { engagementId, version: 1 },
+        data: { engagementId, version: 1, publicToken: generatePublicToken() },
         include: { lineItems: true },
       });
     }
@@ -108,6 +109,7 @@ export async function getOrCreateDraftProposal(ctx: TenantContext, engagementId:
       data: {
         engagementId,
         version: latest.version + 1,
+        publicToken: generatePublicToken(),
         coverNote: latest.coverNote,
         validUntil: latest.validUntil,
         lineItems: {
@@ -264,7 +266,7 @@ export async function sendProposal(ctx: TenantContext, proposalId: string) {
     // PRD §12: enters the follow-up cadence the moment it's waiting on the client.
     await createFollowUpTask(tenantId, proposal.engagementId, "proposal", proposalId);
 
-    const publicUrl = `/p/${proposalId}`;
+    const publicUrl = `/p/${proposal.publicToken}`;
     let emailed = false;
     const clientEmail = proposal.engagement.client.email;
     if (clientEmail) {
@@ -293,9 +295,10 @@ export async function sendProposal(ctx: TenantContext, proposalId: string) {
 // Public (no login) — client-facing proposal view, PRD §4
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function getPublicProposal(proposalId: string) {
+/** `token` is the public-facing identifier (Proposal.publicToken), never the raw id. */
+export async function getPublicProposal(token: string) {
   const proposal = await prisma.proposal.findUniqueOrThrow({
-    where: { id: proposalId },
+    where: { publicToken: token },
     include: {
       lineItems: true,
       engagement: { include: { client: true, tenant: true } },
@@ -311,16 +314,16 @@ export async function getPublicProposal(proposalId: string) {
 
   if (isExpired) {
     status = "expired";
-    await prisma.proposal.update({ where: { id: proposalId }, data: { status: "expired" } });
+    await prisma.proposal.update({ where: { id: proposal.id }, data: { status: "expired" } });
     // PRD §4: an intentionally expired quote should not keep getting nudged.
-    await cancelFollowUpTask("proposal", proposalId);
+    await cancelFollowUpTask("proposal", proposal.id);
   } else if (status === "sent") {
     status = "viewed";
-    await prisma.proposal.update({ where: { id: proposalId }, data: { status: "viewed" } });
+    await prisma.proposal.update({ where: { id: proposal.id }, data: { status: "viewed" } });
   }
 
   return {
-    id: proposal.id,
+    id: proposal.publicToken, // the client's frontend keeps calling this "id" for subsequent requests
     status,
     coverNote: proposal.coverNote,
     validUntil: proposal.validUntil,
@@ -331,13 +334,13 @@ export async function getPublicProposal(proposalId: string) {
   };
 }
 
-export async function declineProposal(proposalId: string) {
-  const proposal = await prisma.proposal.findUniqueOrThrow({ where: { id: proposalId } });
+export async function declineProposal(token: string) {
+  const proposal = await prisma.proposal.findUniqueOrThrow({ where: { publicToken: token } });
   if (proposal.status !== "sent" && proposal.status !== "viewed") {
     throw new Error("This proposal can no longer be declined.");
   }
-  const updated = await prisma.proposal.update({ where: { id: proposalId }, data: { status: "declined" } });
+  const updated = await prisma.proposal.update({ where: { id: proposal.id }, data: { status: "declined" } });
   // PRD §5: a decline is a clear answer, not something to keep chasing.
-  await cancelFollowUpTask("proposal", proposalId);
+  await cancelFollowUpTask("proposal", proposal.id);
   return updated;
 }

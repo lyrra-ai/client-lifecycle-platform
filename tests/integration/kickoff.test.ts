@@ -85,7 +85,7 @@ describe("pickKickoffSlot", () => {
     const { getEngagement } = await import("@/services/engagement");
     const { ctx, engagement, call } = await createScheduledCall();
 
-    await pickKickoffSlot(call.id, SLOT_A);
+    await pickKickoffSlot(call.publicToken, SLOT_A);
 
     const updatedCall = await prisma.kickoffCall.findUniqueOrThrow({ where: { id: call.id } });
     expect(updatedCall.scheduledAt?.toISOString()).toBe(SLOT_A);
@@ -97,7 +97,7 @@ describe("pickKickoffSlot", () => {
     const { pickKickoffSlot } = await import("@/services/kickoff");
     const { call } = await createScheduledCall();
 
-    await expect(pickKickoffSlot(call.id, "2099-01-01T00:00:00.000Z")).rejects.toThrow(/isn't one of the proposed/i);
+    await expect(pickKickoffSlot(call.publicToken, "2099-01-01T00:00:00.000Z")).rejects.toThrow(/isn't one of the proposed/i);
   });
 });
 
@@ -133,7 +133,7 @@ describe("markNoShow / rescheduleKickoffCall / markKickoffDone", () => {
     const { scheduleKickoffCall, pickKickoffSlot, markKickoffDone } = await import("@/services/kickoff");
     const { getEngagement } = await import("@/services/engagement");
     const call = await scheduleKickoffCall(ctx, engagement.id, [SLOT_A]);
-    await pickKickoffSlot(call.id, SLOT_A);
+    await pickKickoffSlot(call.publicToken, SLOT_A);
 
     await markKickoffDone(ctx, call.id);
 
@@ -153,7 +153,7 @@ describe("generateCallSummary", () => {
     const engagement = await createEngagement(tenant.id, client.id, "onboarding");
     const { scheduleKickoffCall, pickKickoffSlot, markKickoffDone } = await import("@/services/kickoff");
     const call = await scheduleKickoffCall(ctx, engagement.id, [SLOT_A]);
-    await pickKickoffSlot(call.id, SLOT_A);
+    await pickKickoffSlot(call.publicToken, SLOT_A);
     await markKickoffDone(ctx, call.id);
     return { ctx, call };
   }

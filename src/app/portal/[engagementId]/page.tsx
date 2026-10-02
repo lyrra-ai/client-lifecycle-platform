@@ -4,10 +4,9 @@
  * truth about Engagement.stage. Mobile-first, <2s load target
  * (System Design §7).
  *
- * The [engagementId] segment is the magic-link token in v1 (a future
- * hardening pass would swap this for a signed/opaque token rather than
- * the raw database id — same category of deferral as every other public
- * link in this app so far).
+ * The [engagementId] segment is Engagement.publicToken, an opaque token
+ * distinct from the raw database id (same pattern as every other public
+ * link in this app).
  */
 import { getPortalData } from "@/services/portal";
 

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { TenantContext } from "@/lib/tenant";
 import type { EngagementStage } from "@prisma/client";
+import { generatePublicToken } from "@/lib/public-token";
 
 export async function createTenant(
   businessName = "Test Tenant",
@@ -31,7 +32,7 @@ export async function createEngagement(
   stage: EngagementStage = "lead",
 ) {
   return prisma.engagement.create({
-    data: { tenantId, clientId, stage },
+    data: { tenantId, clientId, stage, publicToken: generatePublicToken() },
   });
 }
 

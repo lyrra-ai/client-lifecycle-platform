@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTenant, createClient, createEngagement } from "../helpers/factories";
 import { prisma } from "@/lib/db";
+import { generatePublicToken } from "@/lib/public-token";
 
 vi.mock("@/lib/ai-gateway", () => ({
   AIGateway: { generate: vi.fn() },
@@ -80,9 +81,9 @@ describe("submitFeedbackResponse", () => {
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "in_delivery");
     const { createFeedbackRequest, submitFeedbackResponse } = await import("@/services/feedback");
-    const { requestId } = await createFeedbackRequest(ctx, engagement.id);
+    const { requestId, requestToken } = await createFeedbackRequest(ctx, engagement.id);
 
-    await submitFeedbackResponse(requestId, 5, "Great work!");
+    await submitFeedbackResponse(requestToken, 5, "Great work!");
 
     const response = await prisma.feedbackResponse.findUniqueOrThrow({ where: { feedbackRequestId: requestId } });
     expect(response.rating).toBe(5);
@@ -95,9 +96,9 @@ describe("submitFeedbackResponse", () => {
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "in_delivery");
     const { createFeedbackRequest, submitFeedbackResponse } = await import("@/services/feedback");
-    const { requestId } = await createFeedbackRequest(ctx, engagement.id);
+    const { requestToken } = await createFeedbackRequest(ctx, engagement.id);
 
-    await expect(submitFeedbackResponse(requestId, 6)).rejects.toThrow(/between 1 and 5/i);
+    await expect(submitFeedbackResponse(requestToken, 6)).rejects.toThrow(/between 1 and 5/i);
   });
 
   it("rejects a second submission for the same request", async () => {
@@ -105,21 +106,21 @@ describe("submitFeedbackResponse", () => {
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "in_delivery");
     const { createFeedbackRequest, submitFeedbackResponse } = await import("@/services/feedback");
-    const { requestId } = await createFeedbackRequest(ctx, engagement.id);
-    await submitFeedbackResponse(requestId, 4);
+    const { requestToken } = await createFeedbackRequest(ctx, engagement.id);
+    await submitFeedbackResponse(requestToken, 4);
 
-    await expect(submitFeedbackResponse(requestId, 5)).rejects.toThrow(/already been submitted/i);
+    await expect(submitFeedbackResponse(requestToken, 5)).rejects.toThrow(/already been submitted/i);
   });
 
   it("does not close the engagement if handover hasn't been sent yet", async () => {
     const { ctx, tenant } = await createTenant();
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "feedback_requested");
-    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id } });
+    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id , publicToken: generatePublicToken()} });
     const { submitFeedbackResponse } = await import("@/services/feedback");
     const { getEngagement } = await import("@/services/engagement");
 
-    await submitFeedbackResponse(request.id, 5);
+    await submitFeedbackResponse(request.publicToken, 5);
 
     const updated = await getEngagement(ctx, engagement.id);
     expect(updated.stage).toBe("feedback_requested");
@@ -160,10 +161,10 @@ describe("createHandoverPacket / sendHandoverPacket", () => {
     const { ctx, tenant } = await createTenant();
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "feedback_requested");
-    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id } });
+    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id , publicToken: generatePublicToken()} });
     const { submitFeedbackResponse, createHandoverPacket, sendHandoverPacket } = await import("@/services/feedback");
     const { getEngagement } = await import("@/services/engagement");
-    await submitFeedbackResponse(request.id, 5);
+    await submitFeedbackResponse(request.publicToken, 5);
 
     const packet = await createHandoverPacket(ctx, engagement.id, { deliverables: [] });
     await sendHandoverPacket(ctx, packet.id);
@@ -190,14 +191,14 @@ describe("createHandoverPacket / sendHandoverPacket", () => {
     const { ctx, tenant } = await createTenant();
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "feedback_requested");
-    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id } });
+    const request = await prisma.feedbackRequest.create({ data: { engagementId: engagement.id , publicToken: generatePublicToken()} });
     const { createHandoverPacket, sendHandoverPacket, submitFeedbackResponse } = await import("@/services/feedback");
     const { getEngagement } = await import("@/services/engagement");
     const packet = await createHandoverPacket(ctx, engagement.id, { deliverables: [] });
     await sendHandoverPacket(ctx, packet.id);
     expect((await getEngagement(ctx, engagement.id)).stage).toBe("handed_over");
 
-    await submitFeedbackResponse(request.id, 5);
+    await submitFeedbackResponse(request.publicToken, 5);
 
     expect((await getEngagement(ctx, engagement.id)).stage).toBe("closed");
   });

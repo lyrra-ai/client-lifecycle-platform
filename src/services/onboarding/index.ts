@@ -18,10 +18,12 @@ import { sendEmail } from "@/lib/integrations/email";
 import { looksLikeCredential } from "@/lib/credential-check";
 import type { AccessRequestStatus } from "@prisma/client";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
+import { generatePublicToken } from "@/lib/public-token";
 
 function serializeWelcomeDoc(doc: {
   id: string;
   engagementId: string;
+  publicToken: string;
   content: string;
   status: string;
   sentAt: Date | null;
@@ -30,6 +32,7 @@ function serializeWelcomeDoc(doc: {
   return {
     id: doc.id,
     engagementId: doc.engagementId,
+    publicToken: doc.publicToken,
     content: doc.content,
     status: doc.status,
     sentAt: doc.sentAt?.toISOString() ?? null,
@@ -86,7 +89,7 @@ export async function autoCreateWelcomeDoc(ctx: TenantContext, engagementId: str
       ? result.draft
       : FALLBACK_TEMPLATE(engagement.client.name);
 
-    const doc = await prisma.welcomeDoc.create({ data: { engagementId, content } });
+    const doc = await prisma.welcomeDoc.create({ data: { engagementId, content, publicToken: generatePublicToken() } });
     return serializeWelcomeDoc(doc);
   });
 }
@@ -143,7 +146,7 @@ export async function sendWelcomeDoc(ctx: TenantContext, docId: string) {
       await advanceStageAutomatically(ctx, doc.engagementId, "deposit_paid");
     }
 
-    const publicUrl = `/w/${docId}`;
+    const publicUrl = `/w/${doc.publicToken}`;
     let emailed = false;
     const clientEmail = doc.engagement.client.email;
     if (clientEmail) {
@@ -168,9 +171,9 @@ export async function sendWelcomeDoc(ctx: TenantContext, docId: string) {
   });
 }
 
-export async function getPublicWelcomeDoc(docId: string) {
+export async function getPublicWelcomeDoc(token: string) {
   const doc = await prisma.welcomeDoc.findUniqueOrThrow({
-    where: { id: docId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
   return {
@@ -203,6 +206,7 @@ const DEFAULT_QUESTIONS: Omit<IntakeQuestion, "id">[] = [
 function serializeIntakeForm(form: {
   id: string;
   engagementId: string;
+  publicToken: string;
   questions: unknown;
   status: string;
   createdAt: Date;
@@ -210,6 +214,7 @@ function serializeIntakeForm(form: {
   return {
     id: form.id,
     engagementId: form.engagementId,
+    publicToken: form.publicToken,
     questions: form.questions as IntakeQuestion[],
     status: form.status,
     createdAt: form.createdAt.toISOString(),
@@ -251,7 +256,9 @@ export async function autoCreateIntakeForm(ctx: TenantContext, engagementId: str
 
     const questions = await generateQuestions(tenantId, engagementId, acceptedProposal?.coverNote ?? null);
 
-    const form = await prisma.intakeForm.create({ data: { engagementId, questions: questions as unknown as Prisma.InputJsonValue } });
+    const form = await prisma.intakeForm.create({
+      data: { engagementId, questions: questions as unknown as Prisma.InputJsonValue, publicToken: generatePublicToken() },
+    });
     return serializeIntakeForm(form);
   });
 }
@@ -320,7 +327,7 @@ export async function sendIntakeForm(ctx: TenantContext, formId: string) {
     // PRD §12: enters the follow-up cadence the moment it's waiting on the client.
     await createFollowUpTask(tenantId, form.engagementId, "intake_form", formId);
 
-    const publicUrl = `/intake/${formId}`;
+    const publicUrl = `/intake/${form.publicToken}`;
     let emailed = false;
     const clientEmail = form.engagement.client.email;
     if (clientEmail) {
@@ -345,15 +352,16 @@ export async function sendIntakeForm(ctx: TenantContext, formId: string) {
   });
 }
 
-export async function getPublicIntakeForm(formId: string) {
+export async function getPublicIntakeForm(token: string) {
   const form = await prisma.intakeForm.findUniqueOrThrow({
-    where: { id: formId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
-  const response = await prisma.intakeResponse.findFirst({ where: { intakeFormId: formId } });
+  const response = await prisma.intakeResponse.findFirst({ where: { intakeFormId: form.id } });
 
   return {
     ...serializeIntakeForm(form),
+    id: form.publicToken,
     businessName: form.engagement.tenant.businessName,
     clientName: form.engagement.client.name,
     alreadySubmitted: Boolean(response),
@@ -364,11 +372,11 @@ export async function getPublicIntakeForm(formId: string) {
  * One response per form — a resubmission attempt is rejected rather than
  * silently overwriting what the owner may already be acting on.
  */
-export async function submitIntakeResponse(formId: string, answers: Record<string, string>) {
-  const form = await prisma.intakeForm.findUniqueOrThrow({ where: { id: formId } });
+export async function submitIntakeResponse(token: string, answers: Record<string, string>) {
+  const form = await prisma.intakeForm.findUniqueOrThrow({ where: { publicToken: token } });
   const questions = form.questions as unknown as IntakeQuestion[];
 
-  const existing = await prisma.intakeResponse.findFirst({ where: { intakeFormId: formId } });
+  const existing = await prisma.intakeResponse.findFirst({ where: { intakeFormId: form.id } });
   if (existing) {
     throw new Error("This form has already been submitted.");
   }
@@ -378,8 +386,8 @@ export async function submitIntakeResponse(formId: string, answers: Record<strin
     throw new Error(`Please answer: ${missing.map((q) => q.label).join(", ")}`);
   }
 
-  const response = await prisma.intakeResponse.create({ data: { intakeFormId: formId, answers } });
-  await cancelFollowUpTask("intake_form", formId);
+  const response = await prisma.intakeResponse.create({ data: { intakeFormId: form.id, answers } });
+  await cancelFollowUpTask("intake_form", form.id);
   return { id: response.id, submittedAt: response.submittedAt.toISOString() };
 }
 
@@ -564,13 +572,13 @@ export async function setAccessRequestStatus(
   });
 }
 
-export async function getPublicAccessChecklist(engagementId: string) {
+export async function getPublicAccessChecklist(token: string) {
   const engagement = await prisma.engagement.findUniqueOrThrow({
-    where: { id: engagementId },
+    where: { publicToken: token },
     include: { client: true, tenant: true },
   });
   const requests = await prisma.accessRequest.findMany({
-    where: { engagementId },
+    where: { engagementId: engagement.id },
     orderBy: { requestedAt: "asc" },
   });
   return {

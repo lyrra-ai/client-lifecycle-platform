@@ -11,10 +11,12 @@ export interface AccessRequestRow {
 
 export function AccessRequestList({
   engagementId,
+  engagementPublicToken,
   platformLibrary,
   requests,
 }: {
   engagementId: string;
+  engagementPublicToken: string;
   platformLibrary: string[];
   requests: AccessRequestRow[];
 }) {
@@ -94,7 +96,7 @@ export function AccessRequestList({
 
       {requests.length > 0 && (
         <p>
-          <a href={`/access/${engagementId}`}>View client checklist link</a>
+          <a href={`/access/${engagementPublicToken}`}>View client checklist link</a>
         </p>
       )}
 

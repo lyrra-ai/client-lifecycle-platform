@@ -15,6 +15,7 @@ import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { generatePublicToken } from "@/lib/public-token";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Agenda generation
@@ -69,6 +70,7 @@ async function generateAgenda(tenantId: string, engagementId: string): Promise<A
 function serializeKickoffCall(call: {
   id: string;
   engagementId: string;
+  publicToken: string;
   scheduledAt: Date | null;
   proposedSlots: unknown;
   agenda: unknown;
@@ -79,6 +81,7 @@ function serializeKickoffCall(call: {
   return {
     id: call.id,
     engagementId: call.engagementId,
+    publicToken: call.publicToken,
     scheduledAt: call.scheduledAt?.toISOString() ?? null,
     proposedSlots: (call.proposedSlots as string[] | null) ?? [],
     agenda: call.agenda as AgendaSection[] | null,
@@ -102,6 +105,7 @@ export async function scheduleKickoffCall(ctx: TenantContext, engagementId: stri
         engagementId,
         proposedSlots: proposedSlots as unknown as Prisma.InputJsonValue,
         agenda: agenda as unknown as Prisma.InputJsonValue,
+        publicToken: generatePublicToken(),
       },
     });
     return serializeKickoffCall(call);
@@ -187,13 +191,14 @@ export async function markKickoffDone(ctx: TenantContext, callId: string) {
 // Public (no login) — slot picking, PRD §11
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function getPublicKickoffCall(callId: string) {
+export async function getPublicKickoffCall(token: string) {
   const call = await prisma.kickoffCall.findUniqueOrThrow({
-    where: { id: callId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
   return {
     ...serializeKickoffCall(call),
+    id: call.publicToken,
     businessName: call.engagement.tenant.businessName,
     clientName: call.engagement.client.name,
   };
@@ -204,9 +209,9 @@ export async function getPublicKickoffCall(callId: string) {
  * advances the engagement off `onboarding` (System Design §3.1) — not
  * scheduleKickoffCall itself, since proposing slots isn't confirmation.
  */
-export async function pickKickoffSlot(callId: string, chosenSlot: string) {
+export async function pickKickoffSlot(token: string, chosenSlot: string) {
   const call = await prisma.kickoffCall.findUniqueOrThrow({
-    where: { id: callId },
+    where: { publicToken: token },
     include: { engagement: true },
   });
 
@@ -215,13 +220,13 @@ export async function pickKickoffSlot(callId: string, chosenSlot: string) {
     throw new Error("That time isn't one of the proposed slots.");
   }
 
-  await prisma.kickoffCall.update({ where: { id: callId }, data: { scheduledAt: new Date(chosenSlot) } });
+  await prisma.kickoffCall.update({ where: { id: call.id }, data: { scheduledAt: new Date(chosenSlot) } });
 
   if (call.engagement.stage === "onboarding") {
     await advanceStageAutomatically(new TenantContext(call.engagement.tenantId), call.engagementId, "onboarding");
   }
 
-  return { callId, scheduledAt: chosenSlot };
+  return { callId: call.publicToken, scheduledAt: chosenSlot };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

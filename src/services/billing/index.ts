@@ -16,6 +16,7 @@ import { sendEmail } from "@/lib/integrations/email";
 import { getRazorpayClient } from "@/lib/integrations/razorpay";
 import { autoCreateWelcomeDoc, autoCreateIntakeForm } from "@/services/onboarding";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
+import { generatePublicToken } from "@/lib/public-token";
 
 // ─────────────────────────────────────────────────────────────────────────
 // GST (System Design §4) — deterministic, no AI.
@@ -63,6 +64,7 @@ export function computeGstBreakup(
 function serializeInvoice(invoice: {
   id: string;
   engagementId: string;
+  publicToken: string;
   type: InvoiceType;
   amountMinor: bigint;
   currency: string;
@@ -74,6 +76,7 @@ function serializeInvoice(invoice: {
   return {
     id: invoice.id,
     engagementId: invoice.engagementId,
+    publicToken: invoice.publicToken,
     type: invoice.type,
     amountMinor: invoice.amountMinor.toString(),
     amount: Number(invoice.amountMinor) / 100,
@@ -144,6 +147,7 @@ export async function autoCreateDepositInvoices(ctx: TenantContext, engagementId
             currency,
             gstApplicable: gstEligible,
             gstBreakup: gstBreakup ?? undefined,
+            publicToken: generatePublicToken(),
           },
         });
       }),
@@ -218,6 +222,7 @@ export async function createManualInvoice(
         gstApplicable: input.gstApplicable,
         gstBreakup: gstBreakup ?? undefined,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        publicToken: generatePublicToken(),
       },
     });
     return serializeInvoice(invoice);
@@ -292,7 +297,7 @@ export async function sendInvoice(ctx: TenantContext, invoiceId: string) {
     // PRD §12: enters the follow-up cadence the moment it's waiting on the client.
     await createFollowUpTask(tenantId, invoice.engagementId, "invoice", invoiceId);
 
-    const publicUrl = `/i/${invoiceId}`;
+    const publicUrl = `/i/${invoice.publicToken}`;
     let emailed = false;
     const clientEmail = invoice.engagement.client.email;
     if (clientEmail) {
@@ -340,21 +345,23 @@ export async function voidInvoice(ctx: TenantContext, invoiceId: string) {
 // Public (no login) — client-facing invoice view, PRD §6
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function getPublicInvoice(invoiceId: string) {
+/** `token` is the public-facing identifier (Invoice.publicToken), never the raw id. */
+export async function getPublicInvoice(token: string) {
   const invoice = await prisma.invoice.findUniqueOrThrow({
-    where: { id: invoiceId },
+    where: { publicToken: token },
     include: { engagement: { include: { client: true, tenant: true } } },
   });
 
   return {
     ...serializeInvoice(invoice),
+    id: invoice.publicToken, // the client's frontend keeps calling this "id" for subsequent requests
     businessName: invoice.engagement.tenant.businessName,
     clientName: invoice.engagement.client.name,
   };
 }
 
-export async function getPublicPaymentStatus(invoiceId: string) {
-  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+export async function getPublicPaymentStatus(token: string) {
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { publicToken: token } });
   return { status: invoice.status };
 }
 
@@ -369,8 +376,8 @@ export async function getPublicPaymentStatus(invoiceId: string) {
  * returns the existing one if "Pay Now" has already been clicked once —
  * never creates a second order for the same invoice.
  */
-export async function createRazorpayOrderForInvoice(invoiceId: string) {
-  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+export async function createRazorpayOrderForInvoice(token: string) {
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { publicToken: token } });
   if (invoice.status !== "sent") {
     throw new Error("Only a sent invoice can be paid.");
   }
@@ -391,7 +398,7 @@ export async function createRazorpayOrderForInvoice(invoiceId: string) {
     notes: { invoiceId: invoice.id },
   });
 
-  await prisma.invoice.update({ where: { id: invoiceId }, data: { razorpayOrderId: order.id } });
+  await prisma.invoice.update({ where: { id: invoice.id }, data: { razorpayOrderId: order.id } });
 
   return {
     orderId: order.id,

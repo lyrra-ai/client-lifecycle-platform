@@ -30,13 +30,13 @@ async function createSentInvoice() {
     lineItems: [{ description: "Design", qty: 1, unitPrice: 1000, currency: "INR" }],
   });
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "sent" } });
-  await getPublicProposal(draft.id);
+  await getPublicProposal(draft.publicToken);
   await prisma.proposal.update({ where: { id: draft.id }, data: { status: "accepted" } });
 
   const [invoice] = await autoCreateDepositInvoices(ctx, engagement.id);
   await sendInvoice(ctx, invoice!.id);
 
-  return { ctx, tenant, client, engagement, invoiceId: invoice!.id };
+  return { ctx, tenant, client, engagement, invoiceId: invoice!.id, invoicePublicToken: invoice!.publicToken };
 }
 
 function fakePaymentEntity(overrides: Partial<{ id: string; order_id: string; amount: number; method: string; created_at: number; status: string }> = {}) {
@@ -60,9 +60,9 @@ describe("createRazorpayOrderForInvoice", () => {
     const create = vi.fn().mockResolvedValue({ id: "order_abc" });
     (getRazorpayClient as ReturnType<typeof vi.fn>).mockReturnValue({ orders: { create } });
     const { createRazorpayOrderForInvoice } = await import("@/services/billing");
-    const { invoiceId } = await createSentInvoice();
+    const { invoiceId, invoicePublicToken } = await createSentInvoice();
 
-    const order = await createRazorpayOrderForInvoice(invoiceId);
+    const order = await createRazorpayOrderForInvoice(invoicePublicToken);
 
     expect(order.orderId).toBe("order_abc");
     expect(create).toHaveBeenCalledWith(
@@ -77,10 +77,10 @@ describe("createRazorpayOrderForInvoice", () => {
     const create = vi.fn().mockResolvedValue({ id: "order_abc" });
     (getRazorpayClient as ReturnType<typeof vi.fn>).mockReturnValue({ orders: { create } });
     const { createRazorpayOrderForInvoice } = await import("@/services/billing");
-    const { invoiceId } = await createSentInvoice();
-    await createRazorpayOrderForInvoice(invoiceId);
+    const { invoicePublicToken } = await createSentInvoice();
+    await createRazorpayOrderForInvoice(invoicePublicToken);
 
-    const second = await createRazorpayOrderForInvoice(invoiceId);
+    const second = await createRazorpayOrderForInvoice(invoicePublicToken);
 
     expect(second.orderId).toBe("order_abc");
     expect(create).toHaveBeenCalledTimes(1);
@@ -98,7 +98,7 @@ describe("createRazorpayOrderForInvoice", () => {
       gstApplicable: false,
     });
 
-    await expect(createRazorpayOrderForInvoice(invoice.id)).rejects.toThrow(/only a sent invoice/i);
+    await expect(createRazorpayOrderForInvoice(invoice.publicToken)).rejects.toThrow(/only a sent invoice/i);
   });
 });
 

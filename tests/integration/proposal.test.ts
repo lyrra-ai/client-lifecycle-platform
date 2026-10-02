@@ -47,7 +47,7 @@ describe("getOrCreateDraftProposal", () => {
     const draft = await getOrCreateDraftProposal(ctx, engagement.id);
     await withLineItems(ctx, draft.id);
     await sendProposal(ctx, draft.id);
-    await declineProposal(draft.id);
+    await declineProposal(draft.publicToken);
 
     const reopened = await getOrCreateDraftProposal(ctx, engagement.id);
 
@@ -132,7 +132,7 @@ describe("getPublicProposal (no-login client view)", () => {
     await withLineItems(ctx, draft.id);
     await sendProposal(ctx, draft.id);
 
-    const viewed = await getPublicProposal(draft.id);
+    const viewed = await getPublicProposal(draft.publicToken);
 
     expect(viewed.status).toBe("viewed");
   });
@@ -144,7 +144,7 @@ describe("getPublicProposal (no-login client view)", () => {
     await sendProposal(ctx, draft.id);
     await prisma.proposal.update({ where: { id: draft.id }, data: { validUntil: new Date("2000-01-01") } });
 
-    const result = await getPublicProposal(draft.id);
+    const result = await getPublicProposal(draft.publicToken);
 
     expect(result.status).toBe("expired");
   });
@@ -155,7 +155,7 @@ describe("declineProposal", () => {
     const { ctx, engagement } = await createTenantWithEngagement();
     const draft = await getOrCreateDraftProposal(ctx, engagement.id);
 
-    await expect(declineProposal(draft.id)).rejects.toThrow(/no longer be declined/i);
+    await expect(declineProposal(draft.publicToken)).rejects.toThrow(/no longer be declined/i);
   });
 
   it("marks a sent proposal declined", async () => {
@@ -164,7 +164,7 @@ describe("declineProposal", () => {
     await withLineItems(ctx, draft.id);
     await sendProposal(ctx, draft.id);
 
-    const declined = await declineProposal(draft.id);
+    const declined = await declineProposal(draft.publicToken);
 
     expect(declined.status).toBe("declined");
   });

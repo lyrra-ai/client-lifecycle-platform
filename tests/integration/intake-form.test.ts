@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTenant, createClient, createEngagement } from "../helpers/factories";
 import { prisma } from "@/lib/db";
+import { generatePublicToken } from "@/lib/public-token";
 
 vi.mock("@/lib/ai-gateway", () => ({
   AIGateway: { generate: vi.fn() },
@@ -14,7 +15,7 @@ async function createEngagementWithAcceptedProposal(coverNote = "A 3-page websit
   const { ctx, tenant } = await createTenant();
   const client = await createClient(tenant.id, { name: "Dev Patel", email: "dev@test.com" });
   const engagement = await createEngagement(tenant.id, client.id, "deposit_paid");
-  await prisma.proposal.create({ data: { engagementId: engagement.id, status: "accepted", coverNote } });
+  await prisma.proposal.create({ data: { engagementId: engagement.id, status: "accepted", coverNote , publicToken: generatePublicToken()} });
   return { ctx, tenant, client, engagement };
 }
 
@@ -135,7 +136,7 @@ describe("submitIntakeResponse / getPublicIntakeForm", () => {
     const requiredId = form.questions.find((q) => q.required)!.id;
     void requiredId;
 
-    await expect(submitIntakeResponse(form.id, {})).rejects.toThrow(/please answer/i);
+    await expect(submitIntakeResponse(form.publicToken, {})).rejects.toThrow(/please answer/i);
   });
 
   it("accepts a complete submission and marks the public view as already-submitted", async () => {
@@ -143,9 +144,9 @@ describe("submitIntakeResponse / getPublicIntakeForm", () => {
     const { form } = await createSentForm();
     const requiredId = form.questions.find((q) => q.required)!.id;
 
-    await submitIntakeResponse(form.id, { [requiredId]: "An answer" });
+    await submitIntakeResponse(form.publicToken, { [requiredId]: "An answer" });
 
-    const publicView = await getPublicIntakeForm(form.id);
+    const publicView = await getPublicIntakeForm(form.publicToken);
     expect(publicView.alreadySubmitted).toBe(true);
   });
 
@@ -153,16 +154,16 @@ describe("submitIntakeResponse / getPublicIntakeForm", () => {
     const { submitIntakeResponse } = await import("@/services/onboarding");
     const { form } = await createSentForm();
     const requiredId = form.questions.find((q) => q.required)!.id;
-    await submitIntakeResponse(form.id, { [requiredId]: "First answer" });
+    await submitIntakeResponse(form.publicToken, { [requiredId]: "First answer" });
 
-    await expect(submitIntakeResponse(form.id, { [requiredId]: "Second answer" })).rejects.toThrow(/already been submitted/i);
+    await expect(submitIntakeResponse(form.publicToken, { [requiredId]: "Second answer" })).rejects.toThrow(/already been submitted/i);
   });
 
   it("surfaces the submitted answers to the owner", async () => {
     const { submitIntakeResponse, getIntakeFormForOwner } = await import("@/services/onboarding");
     const { ctx, form } = await createSentForm();
     const requiredId = form.questions.find((q) => q.required)!.id;
-    await submitIntakeResponse(form.id, { [requiredId]: "Blue and white" });
+    await submitIntakeResponse(form.publicToken, { [requiredId]: "Blue and white" });
 
     const owned = await getIntakeFormForOwner(ctx, form.id);
 

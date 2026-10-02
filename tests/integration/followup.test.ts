@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTenant, createClient, createEngagement } from "../helpers/factories";
 import { prisma } from "@/lib/db";
+import { generatePublicToken } from "@/lib/public-token";
 
 vi.mock("@/lib/ai-gateway", () => ({
   AIGateway: { generate: vi.fn() },
@@ -79,7 +80,7 @@ describe("end-to-end lifecycle hooks", () => {
     const task = await prisma.followUpTask.findFirstOrThrow({ where: { targetType: "proposal", targetId: draft.id } });
     expect(task.status).toBe("pending");
 
-    await declineProposal(draft.id);
+    await declineProposal(draft.publicToken);
 
     const updated = await prisma.followUpTask.findUniqueOrThrow({ where: { id: task.id } });
     expect(updated.status).toBe("stopped");
@@ -94,14 +95,14 @@ describe("end-to-end lifecycle hooks", () => {
     const { tenant, ctx } = await createTenant();
     const client = await createClient(tenant.id);
     const engagement = await createEngagement(tenant.id, client.id, "deposit_paid");
-    await prisma.proposal.create({ data: { engagementId: engagement.id, status: "accepted" } });
+    await prisma.proposal.create({ data: { engagementId: engagement.id, status: "accepted" , publicToken: generatePublicToken()} });
     const form = await autoCreateIntakeForm(ctx, engagement.id);
     await sendIntakeForm(ctx, form.id);
 
     const task = await prisma.followUpTask.findFirstOrThrow({ where: { targetType: "intake_form", targetId: form.id } });
     expect(task.status).toBe("pending");
 
-    await submitIntakeResponse(form.id, {});
+    await submitIntakeResponse(form.publicToken, {});
 
     const updated = await prisma.followUpTask.findUniqueOrThrow({ where: { id: task.id } });
     expect(updated.status).toBe("stopped");
