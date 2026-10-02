@@ -24,15 +24,24 @@ import { AIGateway } from "@/lib/ai-gateway";
 import { sendEmail } from "@/lib/integrations/email";
 import type { FollowUpTargetType } from "@prisma/client";
 
-const DEFAULT_NUDGE_DAYS = [2, 5, 9];
-const DEFAULT_MAX_NUDGES = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// PRD §14: feedback requests get exactly one nudge, then stop — "valuable
+// but not worth damaging a completed relationship by nagging." Every other
+// target type uses the standard day 2/5/9, up-to-3 cadence (System Design §6).
+function defaultRule(targetType: FollowUpTargetType) {
+  if (targetType === "feedback_request") {
+    return { nudgeDaysAfter: [3], maxNudges: 1 };
+  }
+  return { nudgeDaysAfter: [2, 5, 9], maxNudges: 3 };
+}
 
 async function getRule(tenantId: string, targetType: FollowUpTargetType) {
   const rule = await prisma.followUpRule.findUnique({ where: { tenantId_targetType: { tenantId, targetType } } });
+  const fallback = defaultRule(targetType);
   return {
-    nudgeDaysAfter: rule?.nudgeDaysAfter ?? DEFAULT_NUDGE_DAYS,
-    maxNudges: rule?.maxNudges ?? DEFAULT_MAX_NUDGES,
+    nudgeDaysAfter: rule?.nudgeDaysAfter ?? fallback.nudgeDaysAfter,
+    maxNudges: rule?.maxNudges ?? fallback.maxNudges,
   };
 }
 
@@ -72,6 +81,7 @@ function describeTarget(targetType: FollowUpTargetType): string {
     invoice: "an invoice",
     intake_form: "the intake form",
     access_request: "an access request",
+    feedback_request: "the feedback request",
   }[targetType];
 }
 
@@ -226,13 +236,14 @@ export async function markFollowUpResolvedManually(ctx: TenantContext, taskId: s
 export async function getFollowUpRules(ctx: TenantContext) {
   return withTenant(ctx, async (tenantId) => {
     const rules = await prisma.followUpRule.findMany({ where: { tenantId } });
-    const targetTypes: FollowUpTargetType[] = ["proposal", "invoice", "intake_form", "access_request"];
+    const targetTypes: FollowUpTargetType[] = ["proposal", "invoice", "intake_form", "access_request", "feedback_request"];
     return targetTypes.map((targetType) => {
       const existing = rules.find((r) => r.targetType === targetType);
+      const fallback = defaultRule(targetType);
       return {
         targetType,
-        nudgeDaysAfter: existing?.nudgeDaysAfter ?? DEFAULT_NUDGE_DAYS,
-        maxNudges: existing?.maxNudges ?? DEFAULT_MAX_NUDGES,
+        nudgeDaysAfter: existing?.nudgeDaysAfter ?? fallback.nudgeDaysAfter,
+        maxNudges: existing?.maxNudges ?? fallback.maxNudges,
       };
     });
   });

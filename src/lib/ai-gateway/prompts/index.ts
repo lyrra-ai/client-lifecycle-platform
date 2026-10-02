@@ -101,7 +101,11 @@ const TEMPLATES: Record<AITask, PromptTemplate> = {
     id: "handover_summary",
     version: 1,
     responseFormat: "text",
-    systemPrompt: "Summarize what was delivered against the original scope for a handover packet.",
+    systemPrompt:
+      "Write a short, professional close-out summary of what was delivered, comparing it " +
+      "against the original scope and listing the deliverables given. Suitable for the " +
+      "client's own records and as a first draft for a testimonial/case-study request later. " +
+      "Plain prose, no markdown headers.",
   },
 };
 

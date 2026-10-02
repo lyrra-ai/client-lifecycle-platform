@@ -9,6 +9,7 @@ const TARGET_LABELS: Record<string, string> = {
   invoice: "Invoice",
   intake_form: "Intake form",
   access_request: "Access request",
+  feedback_request: "Feedback request",
 };
 
 export function FollowupList({ tasks }: { tasks: FollowUpTaskRow[] }) {

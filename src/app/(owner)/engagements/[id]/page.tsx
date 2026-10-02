@@ -8,10 +8,12 @@ import {
   PLATFORM_LIBRARY,
 } from "@/services/onboarding";
 import { getKickoffCallForEngagement } from "@/services/kickoff";
+import { listFeedbackRequestsForEngagement, getHandoverPacketForEngagement } from "@/services/feedback";
 import { OpenProposalButton } from "./open-proposal-button";
 import { InvoiceList } from "./invoice-list";
 import { AccessRequestList } from "./access-request-list";
 import { ScheduleKickoff } from "./schedule-kickoff";
+import { FeedbackHandover } from "./feedback-handover";
 
 export default async function EngagementDetailPage({
   params,
@@ -29,6 +31,8 @@ export default async function EngagementDetailPage({
   const intakeForm = await getIntakeFormForEngagement(ctx, id);
   const accessRequests = await listAccessRequestsForEngagement(ctx, id);
   const kickoffCall = await getKickoffCallForEngagement(ctx, id);
+  const feedbackRequests = await listFeedbackRequestsForEngagement(ctx, id);
+  const handoverPacket = await getHandoverPacketForEngagement(ctx, id);
 
   return (
     <main style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
@@ -64,6 +68,11 @@ export default async function EngagementDetailPage({
       ) : (
         <ScheduleKickoff engagementId={engagement.id} />
       )}
+      <FeedbackHandover
+        engagementId={engagement.id}
+        feedbackRequests={feedbackRequests}
+        handoverPacketId={handoverPacket?.id ?? null}
+      />
     </main>
   );
 }

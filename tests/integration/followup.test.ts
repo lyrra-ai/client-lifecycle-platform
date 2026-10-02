@@ -281,7 +281,7 @@ describe("getFollowUpRules / updateFollowUpRule", () => {
 
     const rules = await getFollowUpRules(ctx);
 
-    expect(rules).toHaveLength(4);
+    expect(rules).toHaveLength(5);
     expect(rules.find((r) => r.targetType === "proposal")).toEqual({ targetType: "proposal", nudgeDaysAfter: [2, 5, 9], maxNudges: 3 });
   });
 

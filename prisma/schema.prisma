@@ -443,6 +443,7 @@ enum FollowUpTargetType {
   invoice
   intake_form
   access_request
+  feedback_request
 }
 
 enum FollowUpTaskStatus {

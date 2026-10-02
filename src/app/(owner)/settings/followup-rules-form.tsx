@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
   invoice: "Invoices",
   intake_form: "Intake forms",
   access_request: "Access requests",
+  feedback_request: "Feedback requests",
 };
 
 export function FollowupRulesForm({ initial }: { initial: RuleRow[] }) {
