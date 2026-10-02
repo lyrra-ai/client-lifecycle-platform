@@ -8,8 +8,16 @@ truth for *what* and *why*. This file tracks *sequencing decisions* and
 
 ## Standing rules for this project (don't re-derive, just follow)
 
-- Git commits: author as `0x12md10`, **no** `Co-Authored-By: Claude` line
-  (explicit user override of the default attribution).
+- Git commits: author as `0x12md10 <0x12md10@users.noreply.github.com>`,
+  **no** `Co-Authored-By: Claude` line (explicit user override of the default
+  attribution). **Always use the noreply email, never the user's real Gmail**
+  — GitHub attributes a commit by matching the author *email* to whichever
+  account has it verified, not by who pushes it. A different GitHub account
+  (`0x12m10d`, transposed letters — not this project's account) has the
+  user's real Gmail verified, so a commit authored with that email gets
+  misattributed on GitHub even though the push itself is authenticated
+  correctly. Caught and fixed once already (iteration 16, commit amended +
+  force-pushed) — don't repeat it.
 - Push to `origin main` as `0x12md10` (switch with `gh auth switch --user 0x12md10`
   if a push 403s under a different account).
 - Workflow per feature/iteration: present a plan → get explicit "yes start" →
@@ -115,17 +123,42 @@ Follow-ups, Client Portal, Feedback & Handover, Dashboard/Engagement List
   — this is explicitly the MVP/free-tier choice; user said to revisit
   providers once there are real users, no action needed now.
 
-## Next up, in the user's explicit stated order
+## Paused before iteration 17 — WhatsApp Business API, resuming after a break
 
-1. **WhatsApp Business API** (3rd/last deferred integration). User flagged:
-   expect provider verification lead time — this will likely need the user
-   to go create a Business API account/app before it can be wired up, so
-   flag that early rather than discovering it mid-iteration.
-2. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
+Session paused here at the user's request (2026-10-03). Not started yet —
+only discussed. **Next session: pick up with the decision below before
+writing any code.**
+
+**Cost research done, not yet decided by the user:**
+- Unlike R2 storage, WhatsApp Business API has **no free production tier**
+  for this project's actual use case. No subscription fee either from Meta
+  direct or a BSP (Gupshup/360dialog), and *service* conversations (replying
+  to a customer who messaged first, within 24h) are free — but this
+  project's core use (kickoff reminders, follow-ups, payment nudges) are
+  business-initiated **template messages**, which Meta charges per-message
+  for (utility/marketing/authentication categories), cheap per-message but
+  real cost, not a capped free tier.
+- A free **Meta test number** exists for dev (sends to ≤5 verified test
+  recipients, not production-usable) — fine for building/demoing, not for
+  real client sends.
+- **Business verification** (Meta Business Manager + WhatsApp Business
+  Account) is a one-time dashboard/identity step only the user can do — this
+  is the "provider verification lead time" flagged back in iteration 15's
+  planning; start that clock early.
+- **Open decision for the user:** Meta Cloud API direct (cheapest per-
+  message, more integration work, verification fully on the user) vs. a BSP
+  like Gupshup/360dialog (small per-message markup, often faster onboarding/
+  nicer dashboard). `.env.example`'s `WHATSAPP_PROVIDER_API_KEY` doesn't
+  commit to either — flag this choice to the user again at the start of the
+  next session rather than assuming.
+
+## Still next up after WhatsApp, in the user's explicit stated order
+
+1. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
    connection UI, configurable templates/question-library seeds.
-3. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
+2. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
    CI pipeline.
-4. Deferred to the very end, only if/when the user asks:
+3. Deferred to the very end, only if/when the user asks:
    - **PRD §16** out-of-scope items.
    - **PRD §17** open questions: product/brand name, follow-up cadence
      tuning (currently PRD's proposed 2/5/9 default), WhatsApp provider
