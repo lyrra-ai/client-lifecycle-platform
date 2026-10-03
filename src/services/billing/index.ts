@@ -13,6 +13,7 @@ import { Prisma, type InvoiceType, type PaymentMethod } from "@prisma/client";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { computeTotals } from "@/services/proposal";
 import { notifyClient } from "@/lib/integrations/notify";
+import { absolutePublicUrl } from "@/lib/public-url";
 import { getRazorpayClient } from "@/lib/integrations/razorpay";
 import { autoCreateWelcomeDoc, autoCreateIntakeForm } from "@/services/onboarding";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
@@ -307,11 +308,11 @@ export async function sendInvoice(ctx: TenantContext, invoiceId: string) {
       clientEmail: client.email,
       whatsapp: {
         templateName: "invoice_ready",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "Your invoice is ready",
-        html: `<p>View and pay your invoice: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>View and pay your invoice: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "invoice link",
     });

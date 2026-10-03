@@ -16,6 +16,7 @@ import { advanceStageAutomatically } from "@/services/engagement";
 import { Prisma, type ProposalStatus } from "@prisma/client";
 import { z } from "zod";
 import { notifyClient } from "@/lib/integrations/notify";
+import { absolutePublicUrl } from "@/lib/public-url";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import { generatePublicToken } from "@/lib/public-token";
 
@@ -276,11 +277,11 @@ export async function sendProposal(ctx: TenantContext, proposalId: string) {
       clientEmail: client.email,
       whatsapp: {
         templateName: "proposal_ready",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "Your proposal is ready",
-        html: `<p>View and accept your proposal: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>View and accept your proposal: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "proposal link",
     });

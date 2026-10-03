@@ -14,6 +14,7 @@ import { TenantContext, withTenant } from "@/lib/tenant";
 import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { notifyClient } from "@/lib/integrations/notify";
+import { absolutePublicUrl } from "@/lib/public-url";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import type { Prisma } from "@prisma/client";
 import { generatePublicToken } from "@/lib/public-token";
@@ -62,11 +63,11 @@ export async function createFeedbackRequest(ctx: TenantContext, engagementId: st
       clientEmail: client.email,
       whatsapp: {
         templateName: "feedback_request",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "How did we do?",
-        html: `<p>We'd love your feedback: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>We'd love your feedback: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "feedback request link",
     });
@@ -281,11 +282,11 @@ export async function sendHandoverPacket(ctx: TenantContext, packetId: string) {
       clientEmail: client.email,
       whatsapp: {
         templateName: "handover_ready",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "Your project handover",
-        html: `<p>Here's your handover packet: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>Here's your handover packet: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "handover packet link",
     });

@@ -15,6 +15,7 @@ import type { Prisma } from "@prisma/client";
 import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { notifyClient } from "@/lib/integrations/notify";
+import { absolutePublicUrl } from "@/lib/public-url";
 import { looksLikeCredential } from "@/lib/credential-check";
 import type { AccessRequestStatus } from "@prisma/client";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
@@ -156,11 +157,11 @@ export async function sendWelcomeDoc(ctx: TenantContext, docId: string) {
       clientEmail: client.email,
       whatsapp: {
         templateName: "welcome_doc_ready",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "Welcome aboard!",
-        html: `<p>Your welcome document is ready: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>Your welcome document is ready: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "welcome doc link",
     });
@@ -335,11 +336,11 @@ export async function sendIntakeForm(ctx: TenantContext, formId: string) {
       clientEmail: client.email,
       whatsapp: {
         templateName: "intake_form_request",
-        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+        templateParams: [client.name, absolutePublicUrl(publicUrl)],
       },
       email: {
         subject: "A few quick questions to get started",
-        html: `<p>Please fill this out when you get a chance: <a href="${publicUrl}">${publicUrl}</a></p>`,
+        html: `<p>Please fill this out when you get a chance: <a href="${absolutePublicUrl(publicUrl)}">${absolutePublicUrl(publicUrl)}</a></p>`,
       },
       devLabel: "intake form link",
     });
