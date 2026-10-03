@@ -333,15 +333,30 @@ regression.
 to `main`: `npm ci` -> `prisma generate` -> `npm run typecheck` -> `npm
 test` (unit + integration), against a `postgres:16-alpine` service
 container mapped to port 55433 to match `vitest.config.ts`'s hardcoded
-`TEST_DATABASE_URL` (no source change needed). No secrets required — every
-provider call site already falls back gracefully when a key is unset (same
-behavior this repo's own `.env` already relies on locally with an empty
-`ANTHROPIC_API_KEY`). e2e is deliberately **not** run in CI — needs real
-credentials and a live dev server; stays local-only
-(`npm run test:e2e`), per README. Not yet verified against a real GitHub
-Actions run (no `act` tool available locally to simulate it) — the first
-real push to `main` is the live proof; check the Actions tab after this
-commit lands.
+`TEST_DATABASE_URL` (no source change needed). No AI/email/WhatsApp
+secrets required — every one of those provider call sites already falls
+back gracefully when a key is unset (same behavior this repo's own `.env`
+already relies on locally with an empty `ANTHROPIC_API_KEY`). e2e is
+deliberately **not** run in CI — needs real credentials and a live dev
+server; stays local-only (`npm run test:e2e`), per README.
+
+Pushing `.github/workflows/*` needed the `workflow` OAuth scope, which the
+`0x12md10` `gh` token didn't have (`repo`-only) — GitHub rejects that push
+outright rather than silently stripping the file. Fixed by the user running
+`gh auth refresh -h github.com -s workflow` (needs a browser-based device
+code approval, not something scriptable). **Worth knowing for next time a
+workflow file changes**, not just this once.
+
+**Actually watched the first real GitHub Actions run (not just assumed
+the YAML was correct)** — caught a real gap immediately: unlike the
+AI/email/WhatsApp providers, `src/lib/storage/s3.ts`'s `requireEnv()`
+throws hard with no graceful dev-mode fallback, so `npm test` failed in CI
+on the very first run (`S3_BUCKET not set`) even though it always passes
+locally (this repo's `.env` happens to have real R2 credentials). Fixed by
+adding placeholder `S3_*` env vars to the `npm test` step — safe because no
+test in the suite performs a real S3 upload/delete, only
+`getSignedDownloadUrl()` (presigning), which is a local HMAC computation
+with no network call. Second run: **green**, `test in 1m27s`.
 
 **README's Testing section updated:** added the CI row, corrected an
 inaccurate claim that Anthropic/email/WhatsApp are "mocked... never hit
