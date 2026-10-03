@@ -519,6 +519,79 @@ first-time-signup OTP bug (documented above) was deliberately left alone
 again even though it was hit again during Phase 2 screenshot verification
 — still unrelated to styling, still belongs to whoever next touches auth.
 
+## Iteration 21 — Bug fixes + WhatsApp webhook — DONE
+
+Four items from iteration 20's TODO list, all done in one round.
+
+**1. Fixed the first-time-signup OTP bug** (found in iteration 20, now
+fixed). Root cause: `verifyOtp()` (`src/lib/otp.ts`) always marked the
+code consumed on a correct check, but
+`src/app/api/auth/verify-otp/route.ts` calls it once just to probe
+"is this a known user" before asking for a business name — consuming the
+code on that probe meant the real submission (same code, now with
+`businessName`) always failed as already-used. Fix: `verifyOtp`/
+`verifyLoginOtp` take a `consume` parameter (default `true`, so login and
+e-sign's existing call sites are unaffected); the route only passes
+`consume: false` for the exact case where it's about to ask the client to
+resubmit (new user, no business name yet). Live-verified: replayed the
+literal two-step curl sequence that used to 400 — now succeeds, tenant +
+user created for real. Regression tests added in both `otp.test.ts` and
+`auth-otp.test.ts`. 206/206 suite passing, e-sign e2e re-run clean (shares
+`verifyOtp` under the hood).
+
+**2. Fixed email's relative-path links.** Every `sendEmail` call site
+(`sendProposal`, `sendInvoice`, `sendWelcomeDoc`, `sendIntakeForm`,
+`createFeedbackRequest`, `sendHandoverPacket`) built its HTML body with
+`<a href="${publicUrl}">` where `publicUrl` is a bare path like
+`/p/${token}` — broken in an email client, which has no "current page" to
+resolve a relative URL against (unlike a browser). New
+`src/lib/public-url.ts`'s `absolutePublicUrl()` prepends
+`NEXT_PUBLIC_APP_URL` (the same env var WhatsApp sends already used for
+this exact reason); every email call site now uses it for both the
+WhatsApp template param and the email HTML, instead of duplicating the
+inline template-literal. The `publicUrl` field returned to the owner UI
+itself stays relative — that's correct there, it's same-origin.
+
+**3. Fixed the owner UI not surfacing `whatsapped`.** The 5 editors with
+a post-send confirmation message (Proposal, Invoice, Welcome Doc, Intake
+Form, Handover Packet) only ever checked `emailed` — so a message that
+actually went out via WhatsApp (client's channel preference is
+`whatsapp_first`) showed the misleading "Email not configured — share
+this link manually" text instead of confirming it sent. All 5 now check
+`whatsapped` first, then `emailed`, then the manual-share fallback.
+
+**4. Built the WhatsApp webhook** (`src/app/api/webhooks/whatsapp/route.ts`)
+— the TODO flagged since iteration 17. `GET` handles Meta's one-time
+verification handshake (`hub.mode`/`hub.verify_token`/`hub.challenge`);
+`POST` verifies Meta's `X-Hub-Signature-256` header (HMAC-SHA256 over the
+raw body, keyed by a new `WHATSAPP_APP_SECRET` env var — same
+verify-then-trust pattern as the existing Razorpay webhook) before
+logging delivery-status updates and inbound messages. **Scope is
+deliberately narrow**: logs only, no DB persistence of delivery status
+and no inbound-reply handling — those need a data model that doesn't
+exist yet and weren't asked for; this unblocks the webhook *mechanics*
+(verification, signature security) being testable now, which was the
+explicit ask.
+- New env vars: `WHATSAPP_WEBHOOK_VERIFY_TOKEN` (any string you choose;
+  generated one into `.env` already) and `WHATSAPP_APP_SECRET` (from Meta
+  App Dashboard → Settings → Basic → App Secret — **not** the same as
+  `WHATSAPP_PROVIDER_API_KEY`). `WHATSAPP_APP_SECRET` is still blank in
+  `.env` — needs the user to paste it in before POST signature
+  verification can be tested against a real Meta-sent event.
+- Signature-verification helper added to
+  `src/lib/integrations/whatsapp.ts` (`verifyWebhookSignature`), mirroring
+  `src/lib/integrations/razorpay.ts`'s existing one.
+- Live-verified the `GET` handshake against the real dev server (correct
+  token echoes the challenge, wrong token gets 403). 8 new unit tests
+  (`tests/unit/whatsapp-webhook.test.ts`) cover both handlers with real
+  HMAC signatures, including a tampered-body-stale-signature case.
+- **Not yet live-tested against Meta itself** — that needs `ngrok http
+  3000` (installed, confirmed in PATH) and pasting the resulting public
+  URL + the verify token into Meta's dashboard
+  (WhatsApp → Configuration → Webhook), which is a manual step only the
+  user can do in their own browser session, same as every other Meta
+  dashboard step so far in this project.
+
 ## Notes for whoever (human or Claude) picks this up next
 
 - Don't re-derive the lifecycle state machine, tenant isolation pattern, or
