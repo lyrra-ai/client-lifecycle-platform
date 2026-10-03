@@ -24,6 +24,11 @@ model Tenant {
   defaultDepositPercent Int @default(50) // PRD §6: pre-fills the auto-drafted deposit invoice
   defaultCurrency  String   @default("INR")
   razorpayAccountId String?
+  // PRD §291 "channel preference (WhatsApp-first vs. email-first)" — no
+  // Settings UI to change this yet (TODO, see PROGRESS.md iteration 17),
+  // defaults to email_first since WhatsApp templates are still pending
+  // Meta review at the time this field was added.
+  notificationChannel NotificationChannel @default(email_first)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -34,6 +39,11 @@ model Tenant {
   followUpRules    FollowUpRule[]
 
   @@map("tenants")
+}
+
+enum NotificationChannel {
+  whatsapp_first
+  email_first
 }
 
 enum UserRole {

@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db";
 import { TenantContext, withTenant } from "@/lib/tenant";
 import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
-import { sendEmail } from "@/lib/integrations/email";
+import { notifyClient } from "@/lib/integrations/notify";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import type { Prisma } from "@prisma/client";
 import { generatePublicToken } from "@/lib/public-token";
@@ -53,27 +53,25 @@ export async function createFeedbackRequest(ctx: TenantContext, engagementId: st
     await createFollowUpTask(tenantId, engagementId, "feedback_request", request.id);
 
     const publicUrl = `/feedback/${request.publicToken}`;
-    let emailed = false;
-    const clientEmail = engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "How did we do?",
-          html: `<p>We'd love your feedback: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] feedback request link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "feedback_request",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "How did we do?",
+        html: `<p>We'd love your feedback: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "feedback request link",
+    });
 
-    return { requestId: request.id, requestToken: request.publicToken, publicUrl, emailed };
+    return { requestId: request.id, requestToken: request.publicToken, publicUrl, emailed, whatsapped };
   });
 }
 
@@ -274,27 +272,25 @@ export async function sendHandoverPacket(ctx: TenantContext, packetId: string) {
     await maybeCloseEngagement(packet.engagementId);
 
     const publicUrl = `/handover/${packet.publicToken}`;
-    let emailed = false;
-    const clientEmail = packet.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "Your project handover",
-          html: `<p>Here's your handover packet: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] handover packet link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = packet.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "handover_ready",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "Your project handover",
+        html: `<p>Here's your handover packet: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "handover packet link",
+    });
 
-    return { packetId, publicUrl, emailed };
+    return { packetId, publicUrl, emailed, whatsapped };
   });
 }
 

@@ -21,7 +21,7 @@
 import { prisma } from "@/lib/db";
 import { TenantContext, withTenant } from "@/lib/tenant";
 import { AIGateway } from "@/lib/ai-gateway";
-import { sendEmail } from "@/lib/integrations/email";
+import { notifyClient } from "@/lib/integrations/notify";
 import type { FollowUpTargetType } from "@prisma/client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -184,20 +184,25 @@ export async function reviewAndSendFollowUp(ctx: TenantContext, taskId: string, 
     const attempts = task.attempts + 1;
     const stop = attempts >= rule.maxNudges;
 
-    let emailed = false;
-    const clientEmail = task.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({ tenantId, to: clientEmail, subject: "Just checking in", html: `<p>${finalMessage}</p>` });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] follow-up nudge for ${clientEmail}: ${finalMessage}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    // WhatsApp can't carry the AI-personalized finalMessage verbatim — a
+    // template's wording is fixed, only the {{1}}/{{2}} slots vary. Email
+    // keeps the full personalized draft; WhatsApp sends the generic
+    // "just checking in on X" version using the same two slots as every
+    // other template (client name, item description).
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = task.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "followup_nudge_v2",
+        templateParams: [client.name, describeTarget(task.targetType)],
+      },
+      email: { subject: "Just checking in", html: `<p>${finalMessage}</p>` },
+      devLabel: "follow-up nudge",
+    });
 
     await prisma.followUpTask.update({
       where: { id: taskId },
@@ -210,7 +215,7 @@ export async function reviewAndSendFollowUp(ctx: TenantContext, taskId: string, 
           },
     });
 
-    return { emailed, stopped: stop };
+    return { emailed, whatsapped, stopped: stop };
   });
 }
 

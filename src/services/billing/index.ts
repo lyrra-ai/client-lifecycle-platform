@@ -12,7 +12,7 @@ import { TenantContext, withTenant } from "@/lib/tenant";
 import { Prisma, type InvoiceType, type PaymentMethod } from "@prisma/client";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { computeTotals } from "@/services/proposal";
-import { sendEmail } from "@/lib/integrations/email";
+import { notifyClient } from "@/lib/integrations/notify";
 import { getRazorpayClient } from "@/lib/integrations/razorpay";
 import { autoCreateWelcomeDoc, autoCreateIntakeForm } from "@/services/onboarding";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
@@ -298,27 +298,25 @@ export async function sendInvoice(ctx: TenantContext, invoiceId: string) {
     await createFollowUpTask(tenantId, invoice.engagementId, "invoice", invoiceId);
 
     const publicUrl = `/i/${invoice.publicToken}`;
-    let emailed = false;
-    const clientEmail = invoice.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "Your invoice is ready",
-          html: `<p>View and pay your invoice: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] invoice link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = invoice.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "invoice_ready",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "Your invoice is ready",
+        html: `<p>View and pay your invoice: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "invoice link",
+    });
 
-    return { invoiceId, publicUrl, emailed };
+    return { invoiceId, publicUrl, emailed, whatsapped };
   });
 }
 

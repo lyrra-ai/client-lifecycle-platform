@@ -123,46 +123,120 @@ Follow-ups, Client Portal, Feedback & Handover, Dashboard/Engagement List
   — this is explicitly the MVP/free-tier choice; user said to revisit
   providers once there are real users, no action needed now.
 
-## Paused before iteration 17 — WhatsApp Business API, resuming after a break
+## Iteration 17 — WhatsApp Business API — CORE WIRING DONE, loose ends below
 
-Session paused here at the user's request (2026-10-03). Not started yet —
-only discussed. **Next session: pick up with the decision below before
-writing any code.**
+Provider decision made: **direct Meta Cloud API**, no BSP (Gupshup/360dialog)
+— cost difference was negligible (~$0.0014/msg utility rate in India direct
+vs ~$0.001/msg markup from Gupshup), so going direct avoids a third-party
+dependency.
 
-**Cost research done, not yet decided by the user:**
-- Unlike R2 storage, WhatsApp Business API has **no free production tier**
-  for this project's actual use case. No subscription fee either from Meta
-  direct or a BSP (Gupshup/360dialog), and *service* conversations (replying
-  to a customer who messaged first, within 24h) are free — but this
-  project's core use (kickoff reminders, follow-ups, payment nudges) are
-  business-initiated **template messages**, which Meta charges per-message
-  for (utility/marketing/authentication categories), cheap per-message but
-  real cost, not a capped free tier.
-- A free **Meta test number** exists for dev (sends to ≤5 verified test
-  recipients, not production-usable) — fine for building/demoing, not for
-  real client sends.
-- **Business verification** (Meta Business Manager + WhatsApp Business
-  Account) is a one-time dashboard/identity step only the user can do — this
-  is the "provider verification lead time" flagged back in iteration 15's
-  planning; start that clock early.
-- **Open decision for the user:** Meta Cloud API direct (cheapest per-
-  message, more integration work, verification fully on the user) vs. a BSP
-  like Gupshup/360dialog (small per-message markup, often faster onboarding/
-  nicer dashboard). `.env.example`'s `WHATSAPP_PROVIDER_API_KEY` doesn't
-  commit to either — flag this choice to the user again at the start of the
-  next session rather than assuming.
+Blocked on 2026-10-03 (Meta "restricted from advertising" flag on the
+Developer app-creation wizard), then **unblocked the same day** — Meta's
+Account Quality review cleared faster than the ~3 day estimate. App
+"flowdesk" created under the Asyniq business, test number provisioned.
 
-## Still next up after WhatsApp, in the user's explicit stated order
+**What's implemented and live-verified (real Graph API calls, not mocked):**
+- `src/lib/integrations/whatsapp.ts` — `sendWhatsAppMessage()` posts a
+  template message via `POST /{phone-number-id}/messages` (Graph API
+  v21.0). Normalizes `Client.phone` (free-text, may have `+`/spaces/dashes)
+  to Meta's required digits-only format.
+- 7 message templates created and submitted via the Graph API
+  (`/{WABA_ID}/message_templates`), one per client-facing "your X is ready"
+  moment: `proposal_ready`, `invoice_ready`, `welcome_doc_ready`,
+  `intake_form_request`, `followup_nudge_v2`, `feedback_request`,
+  `handover_ready`. All UTILITY category, `en_US`, 2 body variables each
+  (`{{1}}` client name, `{{2}}` link — except `followup_nudge_v2`'s
+  `{{2}}` is the item description, e.g. "your proposal", matching
+  `describeTarget()` in `src/services/followup/index.ts`, since a
+  template's wording is fixed and can't carry the AI-drafted free text
+  verbatim; email still gets the full personalized draft).
+  **As of 2026-10-03, 5/7 are APPROVED** (`proposal_ready`, `invoice_ready`,
+  `welcome_doc_ready`, `feedback_request`, `followup_nudge_v2`); **2 are
+  still PENDING** (`handover_ready`, `intake_form_request`) — check
+  `GET /{WABA_ID}/message_templates?fields=name,status` and expect approval
+  within hours. Sending with a PENDING template throws, which (in
+  non-production) falls back to email via the notifier below — not a hard
+  failure, just silently prefers email for those two moments until approved.
+  Note: a dangling template named exactly `followup_nudge` (no `_v2`) exists
+  in Meta's system in a permanently-deleting state from a fixed typo during
+  setup — harmless, just don't reuse that name.
+- `prisma/schema.prisma` — `Tenant.notificationChannel` enum
+  (`whatsapp_first` / `email_first`, default `email_first`) — the PRD §12
+  "channel preference" setting. Migration:
+  `prisma/migrations/20261003162032_whatsapp_channel_preference/`.
+- `src/lib/integrations/notify.ts` — new `notifyClient()` shared by every
+  send site: tries the tenant's preferred channel, falls back to the other
+  only if the preferred one didn't actually send (no phone/email on file,
+  or — in dev only — a provider error). **Production still throws on a
+  preferred-channel provider error rather than silently falling back**,
+  matching the pre-existing single-channel `sendEmail` error philosophy at
+  every call site before this module existed — this was a deliberate choice
+  to not invent new production fallback semantics without the user's
+  sign-off; revisit once WhatsApp is actually live for real clients.
+- Wired into all 6 "document ready" send functions (`sendProposal`,
+  `sendInvoice`, `sendWelcomeDoc`, `sendIntakeForm`, `createFeedbackRequest`,
+  `sendHandoverPacket`) and `reviewAndSendFollowUp` — each now returns an
+  added `whatsapped: boolean` alongside the existing `emailed: boolean`.
+  No existing caller/UI reads `whatsapped` yet (see TODOs).
+- `NEXT_PUBLIC_APP_URL` env var added — WhatsApp is plain text and can't
+  resolve a relative path the way an email client's browser context might;
+  used to build absolute links for the WhatsApp template params.
+- Tests: `tests/unit/notify.test.ts` (7 cases, mocked — preferred channel
+  success, fallback on missing contact info, fallback on dev-mode provider
+  error, production rethrow instead of fallback), `tests/unit/whatsapp.test.ts`
+  (3 cases, mocked fetch — missing-config throw, phone normalization +
+  request shape, Meta error passthrough), plus one integration assertion in
+  `tests/integration/billing.test.ts` that `whatsapped` is `false` by
+  default (no client phone on file). Full suite: **184/184 passing**,
+  `tsc --noEmit` clean.
+- Live-verified for real: sent a real template message through the actual
+  `sendWhatsAppMessage()` code path (not curl) to a verified test number
+  and got real delivery.
+
+**TODOs — explicitly deferred, pick up later:**
+1. **Settings UI toggle** for `Tenant.notificationChannel` doesn't exist
+   yet — the field defaults to `email_first` and can currently only be
+   changed via direct DB/Prisma Studio edit. Folds into the already-planned
+   "Settings sub-items" work below (Razorpay/WhatsApp connection UI).
+2. **Webhook not built** — `src/app/api/webhooks/whatsapp/route.ts` doesn't
+   exist. Needed for delivery/read receipts and inbound replies; outbound
+   sends (this iteration's scope) don't need it. Requires a public HTTPS
+   URL (ngrok in dev) and a verify token.
+3. **Still on the test number** (`+1 555 631 9323`, ≤5 verified recipients)
+   — real client sends need the actual business WhatsApp number registered
+   and a payment method added in Meta's "Production setup" checklist
+   (steps left undone there: "Add payment", "Register your WhatsApp phone
+   number" with the real number).
+4. **2 templates still PENDING approval**: `handover_ready`,
+   `intake_form_request` — check status, nothing else to do but wait.
+5. **Email's own links are still relative paths** (`/p/${token}`, pre-
+   existing gap from before this iteration, not something introduced here)
+   — only the new WhatsApp path uses `NEXT_PUBLIC_APP_URL` to build an
+   absolute link. Worth fixing email too once a real domain exists (ties
+   to PRD §17's deferred product/brand-name decision).
+6. **No owner-facing UI surfaces `whatsapped` yet** — e.g. the dashboard/
+   engagement views that currently might show "emailed" status don't know
+   about the new field. Check call sites if/when building that UI.
+7. **Per-client WhatsApp opt-in isn't tracked** — PRD §12 says "where the
+   client has opted in" but there's no `Client`-level consent flag, only
+   the tenant-wide channel preference + whether a phone number is on file.
+   Fine for v1/internal use; revisit before onboarding external tenants
+   (Meta's own policies may require explicit opt-in tracking for template
+   messages at scale).
+
+## Still next up, in the user's explicit stated order
 
 1. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
-   connection UI, configurable templates/question-library seeds.
+   connection UI (incl. the channel-preference toggle above), configurable
+   templates/question-library seeds.
 2. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
    CI pipeline.
 3. Deferred to the very end, only if/when the user asks:
    - **PRD §16** out-of-scope items.
    - **PRD §17** open questions: product/brand name, follow-up cadence
-     tuning (currently PRD's proposed 2/5/9 default), WhatsApp provider
-     choice, external-tenant pricing model.
+     tuning (currently PRD's proposed 2/5/9 default), external-tenant
+     pricing model. (WhatsApp provider choice is now resolved: direct Meta
+     Cloud API.)
 
 ## Notes for whoever (human or Claude) picks this up next
 

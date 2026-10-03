@@ -134,6 +134,15 @@ describe("sendInvoice", () => {
     expect(updated.stage).toBe("deposit_invoiced");
   });
 
+  it("whatsapped stays false when the client has no phone on file (default email_first channel)", async () => {
+    const { ctx, engagement } = await createAcceptedEngagement();
+    const [invoice] = await autoCreateDepositInvoices(ctx, engagement.id);
+
+    const result = await sendInvoice(ctx, invoice!.id);
+
+    expect(result.whatsapped).toBe(false);
+  });
+
   it("refuses to send a zero-amount invoice", async () => {
     const { ctx, engagement } = await createAcceptedEngagement();
     const invoice = await createManualInvoice(ctx, engagement.id, {

@@ -14,7 +14,7 @@ import { TenantContext, withTenant } from "@/lib/tenant";
 import type { Prisma } from "@prisma/client";
 import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
-import { sendEmail } from "@/lib/integrations/email";
+import { notifyClient } from "@/lib/integrations/notify";
 import { looksLikeCredential } from "@/lib/credential-check";
 import type { AccessRequestStatus } from "@prisma/client";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
@@ -147,27 +147,25 @@ export async function sendWelcomeDoc(ctx: TenantContext, docId: string) {
     }
 
     const publicUrl = `/w/${doc.publicToken}`;
-    let emailed = false;
-    const clientEmail = doc.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "Welcome aboard!",
-          html: `<p>Your welcome document is ready: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] welcome doc link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = doc.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "welcome_doc_ready",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "Welcome aboard!",
+        html: `<p>Your welcome document is ready: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "welcome doc link",
+    });
 
-    return { docId, publicUrl, emailed };
+    return { docId, publicUrl, emailed, whatsapped };
   });
 }
 
@@ -328,27 +326,25 @@ export async function sendIntakeForm(ctx: TenantContext, formId: string) {
     await createFollowUpTask(tenantId, form.engagementId, "intake_form", formId);
 
     const publicUrl = `/intake/${form.publicToken}`;
-    let emailed = false;
-    const clientEmail = form.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "A few quick questions to get started",
-          html: `<p>Please fill this out when you get a chance: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] intake form link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = form.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "intake_form_request",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "A few quick questions to get started",
+        html: `<p>Please fill this out when you get a chance: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "intake form link",
+    });
 
-    return { formId, publicUrl, emailed };
+    return { formId, publicUrl, emailed, whatsapped };
   });
 }
 

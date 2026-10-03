@@ -15,7 +15,7 @@ import { AIGateway } from "@/lib/ai-gateway";
 import { advanceStageAutomatically } from "@/services/engagement";
 import { Prisma, type ProposalStatus } from "@prisma/client";
 import { z } from "zod";
-import { sendEmail } from "@/lib/integrations/email";
+import { notifyClient } from "@/lib/integrations/notify";
 import { createFollowUpTask, cancelFollowUpTask } from "@/services/followup";
 import { generatePublicToken } from "@/lib/public-token";
 
@@ -267,27 +267,25 @@ export async function sendProposal(ctx: TenantContext, proposalId: string) {
     await createFollowUpTask(tenantId, proposal.engagementId, "proposal", proposalId);
 
     const publicUrl = `/p/${proposal.publicToken}`;
-    let emailed = false;
-    const clientEmail = proposal.engagement.client.email;
-    if (clientEmail) {
-      try {
-        await sendEmail({
-          tenantId,
-          to: clientEmail,
-          subject: "Your proposal is ready",
-          html: `<p>View and accept your proposal: <a href="${publicUrl}">${publicUrl}</a></p>`,
-        });
-        emailed = true;
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[dev] proposal link for ${clientEmail}: ${publicUrl}`);
-        } else {
-          throw err;
-        }
-      }
-    }
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const client = proposal.engagement.client;
+    const { emailed, whatsapped } = await notifyClient({
+      tenantId,
+      channelPreference: tenant.notificationChannel,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      whatsapp: {
+        templateName: "proposal_ready",
+        templateParams: [client.name, `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${publicUrl}`],
+      },
+      email: {
+        subject: "Your proposal is ready",
+        html: `<p>View and accept your proposal: <a href="${publicUrl}">${publicUrl}</a></p>`,
+      },
+      devLabel: "proposal link",
+    });
 
-    return { proposalId, publicUrl, emailed };
+    return { proposalId, publicUrl, emailed, whatsapped };
   });
 }
 
