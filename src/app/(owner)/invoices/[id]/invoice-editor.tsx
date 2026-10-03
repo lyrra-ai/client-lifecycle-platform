@@ -2,6 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface EditorInvoice {
   id: string;
@@ -20,14 +27,12 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
   const [gstApplicable, setGstApplicable] = useState(initial.gstApplicable);
   const [dueDate, setDueDate] = useState(initial.dueDate?.slice(0, 10) ?? "");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean } | null>(null);
 
   const isDraft = initial.status === "draft";
 
   async function save() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/invoices/${initial.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -36,22 +41,21 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't save.");
+      toast(data.error ?? "Couldn't save.");
       return;
     }
-    setMessage("Saved.");
+    toast("Saved.");
     router.refresh();
   }
 
   async function send() {
     setBusy(true);
-    setMessage(null);
     await save();
     const res = await fetch(`/api/invoices/${initial.id}/send`, { method: "POST" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't send.");
+      toast(data.error ?? "Couldn't send.");
       return;
     }
     setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed });
@@ -60,84 +64,105 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
 
   async function voidAndReissue() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/invoices/${initial.id}/void`, { method: "POST" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't void.");
+      toast(data.error ?? "Couldn't void.");
       return;
     }
-    setMessage("Voided. Create a new invoice from the engagement page to reissue.");
+    toast("Voided. Create a new invoice from the engagement page to reissue.");
     router.refresh();
   }
 
   return (
-    <div style={{ maxWidth: 500, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Invoice ({initial.type}) — {initial.status}</h1>
+    <div className="flex max-w-lg flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-3xl capitalize">{initial.type} invoice</h1>
+        <Badge variant={isDraft ? "secondary" : "default"} className="capitalize">
+          {initial.status}
+        </Badge>
+      </div>
 
-      <label>
-        Amount
-        <input
-          type="number"
-          value={amountMajor}
-          onChange={(e) => setAmountMajor(Number(e.target.value))}
-          disabled={!isDraft}
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
-        />
-      </label>
-      <p>Currency: {initial.currency}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Amount</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                type="number"
+                className="w-40"
+                value={amountMajor}
+                onChange={(e) => setAmountMajor(Number(e.target.value))}
+                disabled={!isDraft}
+              />
+            </div>
+            <p className="pb-2 font-mono text-sm text-muted-foreground">{initial.currency}</p>
+          </div>
 
-      <label>
-        <input
-          type="checkbox"
-          checked={gstApplicable}
-          onChange={(e) => setGstApplicable(e.target.checked)}
-          disabled={!isDraft}
-        />
-        GST applicable
-      </label>
+          <Label className="flex items-center gap-2 font-normal">
+            <Checkbox checked={gstApplicable} onCheckedChange={(v) => setGstApplicable(Boolean(v))} disabled={!isDraft} />
+            GST applicable
+          </Label>
 
-      {initial.gstBreakup && (
-        <ul>
-          {Object.entries(initial.gstBreakup)
-            .filter(([k]) => k !== "hsnSac")
-            .map(([k, v]) => (
-              <li key={k}>{k.toUpperCase()}: {v}</li>
-            ))}
-          <li>HSN/SAC: {initial.gstBreakup.hsnSac}</li>
-        </ul>
-      )}
-      {gstApplicable && !initial.gstBreakup && (
-        <p><em>GST breakup not computed — set the business state (Settings) and the client's state.</em></p>
-      )}
+          {initial.gstBreakup && (
+            <ul className="flex flex-col gap-1 font-mono text-sm text-muted-foreground">
+              {Object.entries(initial.gstBreakup)
+                .filter(([k]) => k !== "hsnSac")
+                .map(([k, v]) => (
+                  <li key={k}>
+                    {k.toUpperCase()}: {v}
+                  </li>
+                ))}
+              <li>HSN/SAC: {initial.gstBreakup.hsnSac}</li>
+            </ul>
+          )}
+          {gstApplicable && !initial.gstBreakup && (
+            <p className="text-sm text-muted-foreground">
+              <em>GST breakup not computed — set the business state (Settings) and the client&apos;s state.</em>
+            </p>
+          )}
 
-      <label>
-        Due date
-        <input
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          disabled={!isDraft}
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
-        />
-      </label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="dueDate">Due date</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              className="w-40"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              disabled={!isDraft}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {isDraft && (
-        <div>
-          <button onClick={save} disabled={busy}>Save draft</button>{" "}
-          <button onClick={send} disabled={busy}>Send to client</button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={save} disabled={busy}>
+            Save draft
+          </Button>
+          <Button onClick={send} disabled={busy}>
+            Send to client
+          </Button>
         </div>
       )}
       {initial.status === "sent" && (
-        <button onClick={voidAndReissue} disabled={busy}>Void (correction requires a new invoice)</button>
+        <Button variant="outline" onClick={voidAndReissue} disabled={busy} className="self-start">
+          Void (correction requires a new invoice)
+        </Button>
       )}
 
-      {message && <p>{message}</p>}
       {sentInfo && (
-        <p>
+        <p className="text-sm text-muted-foreground">
           Sent. {sentInfo.emailed ? "Emailed to the client." : "Email not configured — share this link manually:"}{" "}
-          <a href={sentInfo.publicUrl}>{sentInfo.publicUrl}</a>
+          <a href={sentInfo.publicUrl} className="text-accent-foreground hover:underline">
+            {sentInfo.publicUrl}
+          </a>
         </p>
       )}
     </div>

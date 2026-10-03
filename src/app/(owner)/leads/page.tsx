@@ -6,6 +6,7 @@ import { getSession, requireTenantContext } from "@/lib/auth";
 import { listLeads } from "@/services/engagement/leads";
 import { NewLeadForm } from "./new-lead-form";
 import { LeadRow } from "./lead-row";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function LeadsPage() {
   const session = await getSession();
@@ -14,36 +15,39 @@ export default async function LeadsPage() {
   const leads = await listLeads(requireTenantContext(session));
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Leads</h1>
+    <div className="flex flex-col gap-6">
+      <h1 className="font-serif text-3xl">Leads</h1>
       <NewLeadForm />
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 16 }}>
-        <thead>
-          <tr>
-            <th align="left">Name</th>
-            <th align="left">Company</th>
-            <th align="left">Source</th>
-            <th align="left">Age</th>
-            <th align="left">Status</th>
-            <th align="left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <LeadRow
-              key={lead.id}
-              lead={{
-                id: lead.id,
-                status: lead.status,
-                source: lead.source,
-                createdAt: lead.createdAt.toISOString(),
-                client: lead.client ? { name: lead.client.name, company: lead.client.company } : null,
-              }}
-            />
-          ))}
-        </tbody>
-      </table>
-      {leads.length === 0 && <p>No leads yet.</p>}
-    </main>
+      {leads.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No leads yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Age</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leads.map((lead) => (
+              <LeadRow
+                key={lead.id}
+                lead={{
+                  id: lead.id,
+                  status: lead.status,
+                  source: lead.source,
+                  createdAt: lead.createdAt.toISOString(),
+                  client: lead.client ? { name: lead.client.name, company: lead.client.company } : null,
+                }}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   );
 }

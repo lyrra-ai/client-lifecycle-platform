@@ -9,6 +9,10 @@
  * link in this app).
  */
 import { getPortalData } from "@/services/portal";
+import { PublicShell } from "@/components/public-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const STAGE_LABELS: Record<string, string> = {
   lead: "Lead",
@@ -35,70 +39,101 @@ export default async function ClientPortalPage({
   const currentIndex = data.timeline.indexOf(data.currentStage);
 
   return (
-    <main style={{ maxWidth: 640, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>{data.businessName}</h1>
-      <p>Project status for {data.clientName}</p>
+    <PublicShell>
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="font-serif text-2xl">{data.businessName}</h1>
+          <p className="text-sm text-muted-foreground">Project status for {data.clientName}</p>
+        </div>
 
-      <h2>Timeline</h2>
-      <ol style={{ display: "flex", flexWrap: "wrap", gap: 8, listStyle: "none", padding: 0 }}>
-        {data.timeline.map((stage, i) => (
-          <li
-            key={stage}
-            style={{
-              padding: "4px 10px",
-              borderRadius: 12,
-              background: i === currentIndex ? "#111" : i < currentIndex ? "#ddd" : "#f5f5f5",
-              color: i === currentIndex ? "#fff" : "#333",
-              fontSize: 13,
-            }}
-          >
-            {STAGE_LABELS[stage] ?? stage}
-          </li>
-        ))}
-      </ol>
-
-      {data.todo.length > 0 && (
-        <section>
-          <h2>What we need from you</h2>
-          <ul>
-            {data.todo.map((item) => (
-              <li key={item.href}><a href={item.href}>{item.label}</a></li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section>
-        <h2>Documents</h2>
-        <ul>
-          {data.proposal && (
-            <li><a href={data.proposal.href}>Proposal (v{data.proposal.version}, {data.proposal.status})</a></li>
-          )}
-          {data.invoices.map((inv) => (
-            <li key={inv.id}>
-              <a href={inv.href}>Invoice — {inv.currency} {inv.amount.toFixed(2)} ({inv.status})</a>
+        <ol className="flex flex-wrap gap-2">
+          {data.timeline.map((stage, i) => (
+            <li key={stage}>
+              <Badge
+                variant={i === currentIndex ? "default" : "secondary"}
+                className={cn(i < currentIndex && "opacity-60")}
+              >
+                {STAGE_LABELS[stage] ?? stage}
+              </Badge>
             </li>
           ))}
-          {data.welcomeDoc && <li><a href={data.welcomeDoc.href}>Welcome document</a></li>}
-          {data.intakeForm && (
-            <li><a href={data.intakeForm.href}>Intake form ({data.intakeForm.submitted ? "submitted" : "not yet submitted"})</a></li>
-          )}
-          {data.accessRequests && (
-            <li><a href={data.accessRequests.href}>Access checklist ({data.accessRequests.granted}/{data.accessRequests.total} granted)</a></li>
-          )}
-          {data.kickoffCall && (
-            <li>
-              <a href={data.kickoffCall.href}>
-                Kickoff call ({data.kickoffCall.scheduledAt ? new Date(data.kickoffCall.scheduledAt).toLocaleString() : "pick a time"})
-                {data.kickoffCall.hasSummary ? " — summary available" : ""}
-              </a>
-            </li>
-          )}
-        </ul>
-        {!data.proposal && data.invoices.length === 0 && !data.welcomeDoc && !data.intakeForm && !data.accessRequests && !data.kickoffCall && (
-          <p>Nothing shared yet.</p>
+        </ol>
+
+        {data.todo.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">What we need from you</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col gap-2">
+                {data.todo.map((item) => (
+                  <li key={item.href}>
+                    <a href={item.href} className="text-sm text-accent-foreground hover:underline">
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         )}
-      </section>
-    </main>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Documents</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-2 text-sm">
+              {data.proposal && (
+                <li>
+                  <a href={data.proposal.href} className="text-accent-foreground hover:underline">
+                    Proposal (v{data.proposal.version}, {data.proposal.status})
+                  </a>
+                </li>
+              )}
+              {data.invoices.map((inv) => (
+                <li key={inv.id}>
+                  <a href={inv.href} className="text-accent-foreground hover:underline">
+                    Invoice — {inv.currency} {inv.amount.toFixed(2)} ({inv.status})
+                  </a>
+                </li>
+              ))}
+              {data.welcomeDoc && (
+                <li>
+                  <a href={data.welcomeDoc.href} className="text-accent-foreground hover:underline">
+                    Welcome document
+                  </a>
+                </li>
+              )}
+              {data.intakeForm && (
+                <li>
+                  <a href={data.intakeForm.href} className="text-accent-foreground hover:underline">
+                    Intake form ({data.intakeForm.submitted ? "submitted" : "not yet submitted"})
+                  </a>
+                </li>
+              )}
+              {data.accessRequests && (
+                <li>
+                  <a href={data.accessRequests.href} className="text-accent-foreground hover:underline">
+                    Access checklist ({data.accessRequests.granted}/{data.accessRequests.total} granted)
+                  </a>
+                </li>
+              )}
+              {data.kickoffCall && (
+                <li>
+                  <a href={data.kickoffCall.href} className="text-accent-foreground hover:underline">
+                    Kickoff call ({data.kickoffCall.scheduledAt ? new Date(data.kickoffCall.scheduledAt).toLocaleString() : "pick a time"})
+                    {data.kickoffCall.hasSummary ? " — summary available" : ""}
+                  </a>
+                </li>
+              )}
+            </ul>
+            {!data.proposal && data.invoices.length === 0 && !data.welcomeDoc && !data.intakeForm && !data.accessRequests && !data.kickoffCall && (
+              <p className="text-sm text-muted-foreground">Nothing shared yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </PublicShell>
   );
 }

@@ -5,6 +5,17 @@
  */
 import { getPublicProposal } from "@/services/proposal";
 import { DeclineButton } from "./decline-button";
+import { PublicShell } from "@/components/public-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function formatMinor(totalMinor: string, currency: string): string {
   return `${currency} ${(Number(totalMinor) / 100).toFixed(2)}`;
@@ -19,56 +30,74 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
   const actionable = proposal.status === "viewed";
 
   return (
-    <main style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>{proposal.businessName}</h1>
-      <p>Prepared for {proposal.clientName}</p>
-
-      {proposal.coverNote && <p>{proposal.coverNote}</p>}
-
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">Description</th>
-            <th align="left">Qty</th>
-            <th align="left">Unit price</th>
-            <th align="left">Currency</th>
-          </tr>
-        </thead>
-        <tbody>
-          {proposal.lineItems.map((item) => (
-            <tr key={item.id}>
-              <td>{item.description}</td>
-              <td>{item.qty}</td>
-              <td>{item.unitPrice.toFixed(2)}</td>
-              <td>{item.currency}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h3>Total</h3>
-      <ul>
-        {Object.entries(proposal.totals).map(([currency, minor]) => (
-          <li key={currency}>{formatMinor(minor, currency)}</li>
-        ))}
-      </ul>
-
-      {proposal.validUntil && (
-        <p>Valid until {new Date(proposal.validUntil).toLocaleDateString()}</p>
-      )}
-
-      {actionable ? (
+    <PublicShell>
+      <div className="flex flex-col gap-6">
         <div>
-          <a href={`/esign/${proposal.id}`}>
-            <button>Accept &amp; Sign</button>
-          </a>{" "}
-          <DeclineButton proposalId={proposal.id} />
+          <h1 className="font-serif text-2xl">{proposal.businessName}</h1>
+          <p className="text-sm text-muted-foreground">Prepared for {proposal.clientName}</p>
         </div>
-      ) : proposal.status === "accepted" ? (
-        <p><em>This proposal has been signed. Thank you!</em></p>
-      ) : (
-        <p><em>This proposal is {proposal.status} and can no longer be acted on.</em></p>
-      )}
-    </main>
+
+        {proposal.coverNote && <p className="whitespace-pre-wrap text-sm">{proposal.coverNote}</p>}
+
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Unit price</TableHead>
+                  <TableHead>Currency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {proposal.lineItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell>{item.qty}</TableCell>
+                    <TableCell className="font-mono">{item.unitPrice.toFixed(2)}</TableCell>
+                    <TableCell>{item.currency}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-1 font-mono text-lg">
+              {Object.entries(proposal.totals).map(([currency, minor]) => (
+                <li key={currency}>{formatMinor(minor, currency)}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {proposal.validUntil && (
+          <p className="text-sm text-muted-foreground">Valid until {new Date(proposal.validUntil).toLocaleDateString()}</p>
+        )}
+
+        {actionable ? (
+          <div className="flex gap-2">
+            <Button asChild>
+              <a href={`/esign/${proposal.id}`}>Accept &amp; Sign</a>
+            </Button>
+            <DeclineButton proposalId={proposal.id} />
+          </div>
+        ) : proposal.status === "accepted" ? (
+          <p className="text-sm text-success">
+            <em>This proposal has been signed. Thank you!</em>
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <em>This proposal is {proposal.status} and can no longer be acted on.</em>
+          </p>
+        )}
+      </div>
+    </PublicShell>
   );
 }

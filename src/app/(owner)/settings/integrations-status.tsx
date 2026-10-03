@@ -12,20 +12,21 @@ export interface IntegrationStatus {
 
 function StatusRow({ label, configured }: { label: string; configured: boolean }) {
   return (
-    <div style={{ marginBottom: 4 }}>
-      <span style={{ color: configured ? "green" : "#999" }}>{configured ? "●" : "○"}</span>{" "}
-      {label} — {configured ? "connected" : "not configured"}
+    <div className="flex items-center gap-2 text-sm">
+      <span className={`h-2 w-2 rounded-full ${configured ? "bg-success" : "bg-soft"}`} />
+      <span className="font-medium">{label}</span>
+      <span className="text-muted-foreground">{configured ? "connected" : "not configured"}</span>
     </div>
   );
 }
 
 export function IntegrationsStatus({ status }: { status: IntegrationStatus }) {
   return (
-    <div style={{ maxWidth: 400, marginBottom: 24 }}>
+    <div className="flex flex-col gap-2">
       <StatusRow label="Razorpay" configured={status.razorpayConfigured} />
       <StatusRow label="WhatsApp" configured={status.whatsappConfigured} />
       <StatusRow label="Email" configured={status.emailConfigured} />
-      <p style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+      <p className="mt-1 text-xs text-muted-foreground">
         These are set up once for the whole platform via environment variables, not per account —
         contact support to change them.
       </p>

@@ -2,6 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { ChevronUp, ChevronDown, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface EditorQuestion {
   id: string;
@@ -20,7 +28,6 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
   const router = useRouter();
   const [questions, setQuestions] = useState<EditorQuestion[]>(initial.questions);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean } | null>(null);
 
   function update(i: number, patch: Partial<EditorQuestion>) {
@@ -47,7 +54,6 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
 
   async function save() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/intake-forms/${initial.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -56,36 +62,34 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't save.");
+      toast(data.error ?? "Couldn't save.");
       return;
     }
-    setMessage("Saved.");
+    toast("Saved.");
     router.refresh();
   }
 
   async function regenerate() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/intake-forms/${initial.id}/regenerate`, { method: "POST" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't regenerate.");
+      toast(data.error ?? "Couldn't regenerate.");
       return;
     }
     setQuestions(data.form.questions);
-    setMessage("Regenerated from current scope — review before sending.");
+    toast("Regenerated from current scope — review before sending.");
   }
 
   async function send() {
     setBusy(true);
-    setMessage(null);
     await save();
     const res = await fetch(`/api/intake-forms/${initial.id}/send`, { method: "POST" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't send.");
+      toast(data.error ?? "Couldn't send.");
       return;
     }
     setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed });
@@ -93,51 +97,84 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Intake Form — {initial.status}</h1>
-      <p><em>Editable at any time, even after sending — scope changes happen (PRD §9).</em></p>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-3xl">Intake Form</h1>
+        <Badge variant="secondary" className="capitalize">
+          {initial.status}
+        </Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        <em>Editable at any time, even after sending — scope changes happen (PRD §9).</em>
+      </p>
 
-      {questions.map((q, i) => (
-        <div key={q.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-          <input
-            value={q.label}
-            onChange={(e) => update(i, { label: e.target.value })}
-            style={{ flex: 1 }}
-          />
-          <label>
-            <input type="checkbox" checked={q.required} onChange={(e) => update(i, { required: e.target.checked })} />
-            Required
-          </label>
-          <button onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
-          <button onClick={() => move(i, 1)} disabled={i === questions.length - 1}>↓</button>
-          <button onClick={() => remove(i)}>Remove</button>
-        </div>
-      ))}
-      <button onClick={addQuestion}>+ Add question</button>
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {questions.map((q, i) => (
+            <div key={q.id} className="flex items-center gap-2">
+              <Input value={q.label} onChange={(e) => update(i, { label: e.target.value })} className="flex-1" />
+              <Label className="flex items-center gap-1.5 whitespace-nowrap text-sm font-normal">
+                <Checkbox checked={q.required} onCheckedChange={(v) => update(i, { required: Boolean(v) })} />
+                Required
+              </Label>
+              <Button size="icon-sm" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0}>
+                <ChevronUp />
+              </Button>
+              <Button size="icon-sm" variant="ghost" onClick={() => move(i, 1)} disabled={i === questions.length - 1}>
+                <ChevronDown />
+              </Button>
+              <Button size="icon-sm" variant="ghost" onClick={() => remove(i)}>
+                <X />
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" className="self-start" onClick={addQuestion}>
+            + Add question
+          </Button>
+        </CardContent>
+      </Card>
 
-      <div style={{ marginTop: 16 }}>
-        <button onClick={save} disabled={busy}>Save</button>{" "}
-        <button onClick={regenerate} disabled={busy}>Regenerate from scope</button>{" "}
-        <button onClick={send} disabled={busy}>Send to client</button>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={save} disabled={busy}>
+          Save
+        </Button>
+        <Button variant="outline" onClick={regenerate} disabled={busy}>
+          Regenerate from scope
+        </Button>
+        <Button onClick={send} disabled={busy}>
+          Send to client
+        </Button>
       </div>
 
-      {message && <p>{message}</p>}
       {sentInfo && (
-        <p>
+        <p className="text-sm text-muted-foreground">
           Sent. {sentInfo.emailed ? "Emailed to the client." : "Email not configured — share this link manually:"}{" "}
-          <a href={sentInfo.publicUrl}>{sentInfo.publicUrl}</a>
+          <a href={sentInfo.publicUrl} className="text-accent-foreground hover:underline">
+            {sentInfo.publicUrl}
+          </a>
         </p>
       )}
 
       {initial.response && (
-        <div style={{ marginTop: 24, border: "1px solid #ccc", padding: 12 }}>
-          <h3>Client's answers (submitted {new Date(initial.response.submittedAt).toLocaleString()})</h3>
-          <ul>
-            {questions.map((q) => (
-              <li key={q.id}><strong>{q.label}:</strong> {initial.response!.answers[q.id] || "(no answer)"}</li>
-            ))}
-          </ul>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Client&apos;s answers (submitted {new Date(initial.response.submittedAt).toLocaleString()})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-1 text-sm">
+              {questions.map((q) => (
+                <li key={q.id}>
+                  <strong>{q.label}:</strong> {initial.response!.answers[q.id] || "(no answer)"}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

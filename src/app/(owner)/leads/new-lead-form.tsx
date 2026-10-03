@@ -6,6 +6,8 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function NewLeadForm() {
   const router = useRouter();
@@ -54,24 +56,28 @@ export function NewLeadForm() {
 
   if (!open) {
     return (
-      <div>
-        <button onClick={() => setOpen(true)}>+ New Lead</button>
-        {notice && <p>{notice}</p>}
+      <div className="flex items-center gap-3">
+        <Button onClick={() => setOpen(true)}>+ New Lead</Button>
+        {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} style={{ border: "1px solid #ccc", padding: 12, marginBottom: 12 }}>
-      <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-      <input placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} />
-      <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <input placeholder="State (for GST)" value={state} onChange={(e) => setState(e.target.value)} />
-      <input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-      <button type="submit" disabled={submitting}>Save</button>
-      <button type="button" onClick={() => setOpen(false)}>Cancel</button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+    <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/30 p-4">
+      <Input className="w-40" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+      <Input className="w-40" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} />
+      <Input className="w-48" placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input className="w-36" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Input className="w-32" placeholder="State (for GST)" value={state} onChange={(e) => setState(e.target.value)} />
+      <Input className="w-40" placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <Button type="submit" disabled={submitting}>
+        Save
+      </Button>
+      <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+        Cancel
+      </Button>
+      {error && <p className="w-full text-sm text-destructive">{error}</p>}
     </form>
   );
 }

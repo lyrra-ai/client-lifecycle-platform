@@ -3,21 +3,26 @@
  */
 import { getPublicFeedbackRequest } from "@/services/feedback";
 import { FeedbackForm } from "./feedback-form";
+import { PublicShell } from "@/components/public-shell";
 
 export default async function PublicFeedbackPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const request = await getPublicFeedbackRequest(id);
 
   return (
-    <main style={{ maxWidth: 480, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>{request.businessName}</h1>
-      <p>How did we do, {request.clientName}?</p>
+    <PublicShell>
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="font-serif text-2xl">{request.businessName}</h1>
+          <p className="text-sm text-muted-foreground">How did we do, {request.clientName}?</p>
+        </div>
 
-      {request.alreadySubmitted ? (
-        <p>You've already shared your feedback. Thank you!</p>
-      ) : (
-        <FeedbackForm requestId={request.id} />
-      )}
-    </main>
+        {request.alreadySubmitted ? (
+          <p className="text-sm text-success">You&apos;ve already shared your feedback. Thank you!</p>
+        ) : (
+          <FeedbackForm requestId={request.id} />
+        )}
+      </div>
+    </PublicShell>
   );
 }

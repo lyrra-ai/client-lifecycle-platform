@@ -4,15 +4,18 @@
  */
 import { getEsignContext } from "@/services/proposal/esign";
 import { EsignFlow } from "./esign-flow";
+import { PublicShell } from "@/components/public-shell";
 
 export default async function EsignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await getEsignContext(id);
 
   return (
-    <main style={{ maxWidth: 480, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>Sign &amp; Accept</h1>
-      <EsignFlow context={context} />
-    </main>
+    <PublicShell>
+      <div className="flex flex-col gap-6">
+        <h1 className="font-serif text-2xl">Sign &amp; Accept</h1>
+        <EsignFlow context={context} />
+      </div>
+    </PublicShell>
   );
 }

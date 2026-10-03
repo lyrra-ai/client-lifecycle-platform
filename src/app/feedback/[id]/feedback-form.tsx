@@ -1,6 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function FeedbackForm({ requestId }: { requestId: string }) {
   const [rating, setRating] = useState(5);
@@ -28,28 +38,34 @@ export function FeedbackForm({ requestId }: { requestId: string }) {
   }
 
   if (submitted) {
-    return <p>Thank you for your feedback!</p>;
+    return <p className="text-sm text-success">Thank you for your feedback!</p>;
   }
 
   return (
-    <form onSubmit={submit}>
-      <label>
-        Rating (1-5)
-        <select value={rating} onChange={(e) => setRating(Number(e.target.value))} style={{ display: "block", marginTop: 4 }}>
-          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </label>
-      <label style={{ display: "block", marginTop: 12 }}>
-        Comments (optional)
-        <textarea
-          value={comments}
-          onChange={(e) => setComments(e.target.value)}
-          rows={4}
-          style={{ display: "block", width: "100%", marginTop: 4 }}
-        />
-      </label>
-      <button type="submit" disabled={busy} style={{ marginTop: 12 }}>Submit</button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label>Rating (1-5)</Label>
+        <Select value={String(rating)} onValueChange={(v) => setRating(Number(v))}>
+          <SelectTrigger className="w-24">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Comments (optional)</Label>
+        <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4} />
+      </div>
+      <Button type="submit" disabled={busy} className="self-start">
+        Submit
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </form>
   );
 }

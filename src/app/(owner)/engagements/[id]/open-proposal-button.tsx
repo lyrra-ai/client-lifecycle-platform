@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function OpenProposalButton({ engagementId }: { engagementId: string }) {
   const router = useRouter();
@@ -16,8 +17,8 @@ export function OpenProposalButton({ engagementId }: { engagementId: string }) {
   }
 
   return (
-    <button onClick={open} disabled={busy}>
+    <Button onClick={open} disabled={busy}>
       Open Proposal
-    </button>
+    </Button>
   );
 }

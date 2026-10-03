@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function ScheduleKickoff({ engagementId }: { engagementId: string }) {
   const router = useRouter();
@@ -30,20 +32,29 @@ export function ScheduleKickoff({ engagementId }: { engagementId: string }) {
   }
 
   if (!open) {
-    return <button onClick={() => setOpen(true)}>Schedule Kickoff</button>;
+    return (
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Schedule Kickoff
+      </Button>
+    );
   }
 
   return (
-    <div style={{ border: "1px solid #ccc", padding: 12, marginTop: 8 }}>
-      <input
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+      <Input
         placeholder="Proposed times, comma-separated ISO datetimes (e.g. 2026-10-10T15:00:00Z, 2026-10-11T15:00:00Z)"
         value={slots}
         onChange={(e) => setSlots(e.target.value)}
-        style={{ width: "100%" }}
       />
-      <button onClick={schedule} disabled={busy} style={{ marginTop: 8 }}>Schedule</button>{" "}
-      <button onClick={() => setOpen(false)}>Cancel</button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <div className="flex gap-2">
+        <Button size="sm" onClick={schedule} disabled={busy}>
+          Schedule
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

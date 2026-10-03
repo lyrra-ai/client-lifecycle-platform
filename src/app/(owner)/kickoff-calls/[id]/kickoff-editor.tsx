@@ -2,6 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface AgendaSection {
   title: string;
@@ -26,23 +34,21 @@ export interface EditorKickoffCall {
 
 export function KickoffEditor({ initial }: { initial: EditorKickoffCall }) {
   const router = useRouter();
-  const [agenda, setAgenda] = useState<AgendaSection[]>(initial.agenda ?? []);
+  const [agenda] = useState<AgendaSection[]>(initial.agenda ?? []);
   const [notes, setNotes] = useState("");
   const [recordingUrl, setRecordingUrl] = useState("");
   const [rescheduleSlots, setRescheduleSlots] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   async function saveAgenda() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/kickoff/${initial.id}/agenda`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sections: agenda }),
     });
     setBusy(false);
-    setMessage(res.ok ? "Agenda saved." : "Couldn't save agenda.");
+    toast(res.ok ? "Agenda saved." : "Couldn't save agenda.");
     router.refresh();
   }
 
@@ -76,7 +82,6 @@ export function KickoffEditor({ initial }: { initial: EditorKickoffCall }) {
 
   async function generateSummary() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/kickoff/${initial.id}/summary`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,7 +90,7 @@ export function KickoffEditor({ initial }: { initial: EditorKickoffCall }) {
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't generate summary.");
+      toast(data.error ?? "Couldn't generate summary.");
       return;
     }
     router.refresh();
@@ -103,73 +108,117 @@ export function KickoffEditor({ initial }: { initial: EditorKickoffCall }) {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Kickoff Call — {initial.status}</h1>
-      {initial.scheduledAt ? (
-        <p>Scheduled for {new Date(initial.scheduledAt).toLocaleString()}</p>
-      ) : (
-        <p>Waiting on the client to pick a slot: {initial.proposedSlots.join(", ")}</p>
-      )}
-
-      <h3>Agenda</h3>
-      {agenda.map((section, i) => (
-        <div key={i} style={{ marginBottom: 8 }}>
-          <strong>{section.title}</strong> ({section.durationMinutes} min)
-          <ul>
-            {section.talkingPoints.map((tp, j) => <li key={j}>{tp}</li>)}
-          </ul>
-        </div>
-      ))}
-      <button onClick={saveAgenda} disabled={busy}>Save agenda</button>
-
-      <h3>Status actions</h3>
-      <button onClick={markNoShow} disabled={busy}>Mark no-show</button>{" "}
-      <button onClick={markDone} disabled={busy}>Mark done</button>
-      <div style={{ marginTop: 8 }}>
-        <input
-          placeholder="New slots, comma-separated ISO datetimes"
-          value={rescheduleSlots}
-          onChange={(e) => setRescheduleSlots(e.target.value)}
-          style={{ width: "60%" }}
-        />
-        <button onClick={reschedule} disabled={busy}>Reschedule</button>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-3xl">Kickoff Call</h1>
+        <Badge variant="secondary" className="capitalize">
+          {initial.status}
+        </Badge>
       </div>
-
-      <h3>Post-call summary</h3>
-      {initial.summary ? (
-        <div>
-          <p>{initial.summary.summaryText}</p>
-          <ul>
-            {initial.summary.actionItems.map((item, i) => (
-              <li key={i}>
-                <label>
-                  <input type="checkbox" checked={item.done} onChange={(e) => toggleItem(i, e.target.checked)} />
-                  [{item.owner}] {item.description}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {initial.scheduledAt ? (
+        <p className="text-sm text-muted-foreground">Scheduled for {new Date(initial.scheduledAt).toLocaleString()}</p>
       ) : (
-        <div>
-          <textarea
-            placeholder="Paste rough notes from the call (optional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            style={{ width: "100%" }}
-          />
-          <input
-            placeholder="Recording URL (optional)"
-            value={recordingUrl}
-            onChange={(e) => setRecordingUrl(e.target.value)}
-            style={{ display: "block", width: "100%", marginTop: 8 }}
-          />
-          <button onClick={generateSummary} disabled={busy} style={{ marginTop: 8 }}>Generate summary</button>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Waiting on the client to pick a slot: {initial.proposedSlots.join(", ")}
+        </p>
       )}
 
-      {message && <p>{message}</p>}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agenda</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {agenda.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No agenda generated yet.</p>
+          ) : (
+            agenda.map((section, i) => (
+              <div key={i}>
+                <p className="text-sm font-medium">
+                  {section.title} <span className="text-muted-foreground">({section.durationMinutes} min)</span>
+                </p>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                  {section.talkingPoints.map((tp, j) => (
+                    <li key={j}>{tp}</li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+          <Button variant="outline" size="sm" className="self-start" onClick={saveAgenda} disabled={busy}>
+            Save agenda
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Status actions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={markNoShow} disabled={busy}>
+              Mark no-show
+            </Button>
+            <Button variant="outline" size="sm" onClick={markDone} disabled={busy}>
+              Mark done
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="New slots, comma-separated ISO datetimes"
+              value={rescheduleSlots}
+              onChange={(e) => setRescheduleSlots(e.target.value)}
+              className="flex-1"
+            />
+            <Button variant="outline" size="sm" onClick={reschedule} disabled={busy}>
+              Reschedule
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Post-call summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {initial.summary ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm">{initial.summary.summaryText}</p>
+              <ul className="flex flex-col gap-2">
+                {initial.summary.actionItems.map((item, i) => (
+                  <li key={i}>
+                    <Label className="flex items-center gap-2 text-sm font-normal">
+                      <Checkbox checked={item.done} onCheckedChange={(v) => toggleItem(i, Boolean(v))} />
+                      <Badge variant="outline" className="capitalize">
+                        {item.owner}
+                      </Badge>
+                      {item.description}
+                    </Label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Textarea
+                placeholder="Paste rough notes from the call (optional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+              />
+              <Input
+                placeholder="Recording URL (optional)"
+                value={recordingUrl}
+                onChange={(e) => setRecordingUrl(e.target.value)}
+              />
+              <Button variant="outline" size="sm" className="self-start" onClick={generateSummary} disabled={busy}>
+                Generate summary
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

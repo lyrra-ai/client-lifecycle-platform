@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 
 export interface EditorWelcomeDoc {
   id: string;
@@ -13,14 +18,12 @@ export function WelcomeDocEditor({ initial }: { initial: EditorWelcomeDoc }) {
   const router = useRouter();
   const [content, setContent] = useState(initial.content);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean } | null>(null);
 
   const isDraft = initial.status === "draft";
 
   async function save() {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/welcome-docs/${initial.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -29,22 +32,21 @@ export function WelcomeDocEditor({ initial }: { initial: EditorWelcomeDoc }) {
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't save.");
+      toast(data.error ?? "Couldn't save.");
       return;
     }
-    setMessage("Saved.");
+    toast("Saved.");
     router.refresh();
   }
 
   async function send() {
     setBusy(true);
-    setMessage(null);
     await save();
     const res = await fetch(`/api/welcome-docs/${initial.id}/send`, { method: "POST" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't send.");
+      toast(data.error ?? "Couldn't send.");
       return;
     }
     setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed });
@@ -52,26 +54,37 @@ export function WelcomeDocEditor({ initial }: { initial: EditorWelcomeDoc }) {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Welcome Doc — {initial.status}</h1>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        disabled={!isDraft}
-        rows={14}
-        style={{ width: "100%" }}
-      />
+    <div className="flex max-w-2xl flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-3xl">Welcome Doc</h1>
+        <Badge variant={isDraft ? "secondary" : "default"} className="capitalize">
+          {initial.status}
+        </Badge>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <Textarea value={content} onChange={(e) => setContent(e.target.value)} disabled={!isDraft} rows={14} />
+        </CardContent>
+      </Card>
+
       {isDraft && (
-        <div style={{ marginTop: 8 }}>
-          <button onClick={save} disabled={busy}>Save draft</button>{" "}
-          <button onClick={send} disabled={busy}>Send to client</button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={save} disabled={busy}>
+            Save draft
+          </Button>
+          <Button onClick={send} disabled={busy}>
+            Send to client
+          </Button>
         </div>
       )}
-      {message && <p>{message}</p>}
+
       {sentInfo && (
-        <p>
+        <p className="text-sm text-muted-foreground">
           Sent. {sentInfo.emailed ? "Emailed to the client." : "Email not configured — share this link manually:"}{" "}
-          <a href={sentInfo.publicUrl}>{sentInfo.publicUrl}</a>
+          <a href={sentInfo.publicUrl} className="text-accent-foreground hover:underline">
+            {sentInfo.publicUrl}
+          </a>
         </p>
       )}
     </div>

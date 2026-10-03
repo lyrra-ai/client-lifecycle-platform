@@ -1,12 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export interface TeamMemberRow {
   id: string;
   name: string;
   email: string;
   role: "owner" | "team_member";
+}
+
+function initials(name: string): string {
+  return name.trim().slice(0, 2).toUpperCase();
 }
 
 export function TeamMembersPanel({
@@ -21,13 +30,11 @@ export function TeamMembersPanel({
   const [members, setMembers] = useState(initial);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMessage(null);
     const res = await fetch("/api/settings/team-members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,63 +43,57 @@ export function TeamMembersPanel({
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't add team member.");
+      toast(data.error ?? "Couldn't add team member.");
       return;
     }
     setMembers((ms) => [...ms, data.member]);
     setName("");
     setEmail("");
-    setMessage(`Added ${data.member.name}. They can log in with ${data.member.email} using the usual email code.`);
+    toast(`Added ${data.member.name}. They can log in with ${data.member.email} using the usual email code.`);
   }
 
   async function removeMember(id: string) {
     setBusy(true);
-    setMessage(null);
     const res = await fetch(`/api/settings/team-members/${id}`, { method: "DELETE" });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage(data.error ?? "Couldn't remove team member.");
+      toast(data.error ?? "Couldn't remove team member.");
       return;
     }
     setMembers((ms) => ms.filter((m) => m.id !== id));
   }
 
   return (
-    <div style={{ maxWidth: 500, marginBottom: 24 }}>
-      <ul style={{ listStyle: "none", padding: 0 }}>
+    <div className="flex flex-col gap-4">
+      <ul className="flex flex-col gap-2">
         {members.map((m) => (
-          <li key={m.id} style={{ marginBottom: 6 }}>
-            {m.name} &middot; {m.email} &middot; {m.role}
+          <li key={m.id} className="flex items-center gap-3 text-sm">
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="text-xs">{initials(m.name)}</AvatarFallback>
+            </Avatar>
+            <span className="font-medium">{m.name}</span>
+            <span className="text-muted-foreground">{m.email}</span>
+            <Badge variant="secondary">{m.role.replace(/_/g, " ")}</Badge>
+            {m.id === currentUserId && <span className="text-muted-foreground">(you)</span>}
             {isOwner && m.id !== currentUserId && (
-              <button onClick={() => removeMember(m.id)} disabled={busy} style={{ marginLeft: 8 }}>
+              <Button size="sm" variant="ghost" onClick={() => removeMember(m.id)} disabled={busy} className="ml-auto">
                 Remove
-              </button>
+              </Button>
             )}
-            {m.id === currentUserId && <span style={{ marginLeft: 8, color: "#999" }}>(you)</span>}
           </li>
         ))}
       </ul>
 
       {isOwner && (
-        <form onSubmit={addMember} style={{ marginTop: 12 }}>
-          <input
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ marginRight: 8 }}
-          />
-          <input
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ marginRight: 8 }}
-          />
-          <button type="submit" disabled={busy}>Add team member</button>
+        <form onSubmit={addMember} className="flex flex-wrap items-center gap-2">
+          <Input className="w-40" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input className="w-56" placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Button type="submit" size="sm" disabled={busy}>
+            Add team member
+          </Button>
         </form>
       )}
-      {message && <p>{message}</p>}
     </div>
   );
 }

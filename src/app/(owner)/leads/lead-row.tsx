@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { TableCell, TableRow } from "@/components/ui/table";
 
 export interface LeadRowData {
   id: string;
@@ -37,24 +40,26 @@ export function LeadRow({ lead }: { lead: LeadRowData }) {
   }
 
   return (
-    <tr>
-      <td>{lead.client?.name ?? "—"}</td>
-      <td>{lead.client?.company ?? "—"}</td>
-      <td>{lead.source}</td>
-      <td>{daysSince(lead.createdAt)}d</td>
-      <td>{lead.status}</td>
-      <td>
+    <TableRow>
+      <TableCell className="font-medium">{lead.client?.name ?? "—"}</TableCell>
+      <TableCell>{lead.client?.company ?? "—"}</TableCell>
+      <TableCell className="capitalize">{lead.source.replace(/_/g, " ")}</TableCell>
+      <TableCell className="text-muted-foreground">{daysSince(lead.createdAt)}d</TableCell>
+      <TableCell>
+        <Badge variant={lead.status === "lost" ? "destructive" : "secondary"}>{lead.status}</Badge>
+      </TableCell>
+      <TableCell className="flex gap-2">
         {lead.status !== "lost" && (
           <>
-            <button onClick={createProposal} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={createProposal} disabled={busy}>
               Create Proposal
-            </button>{" "}
-            <button onClick={markLost} disabled={busy}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={markLost} disabled={busy}>
               Mark lost
-            </button>
+            </Button>
           </>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }

@@ -8,6 +8,7 @@
  * checkout callback directly.
  */
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 declare global {
   interface Window {
@@ -69,16 +70,20 @@ export function Checkout({ invoiceId, amountMinor, currency }: { invoiceId: stri
   }
 
   if (status === "paid") {
-    return <p><strong>Payment confirmed. Thank you!</strong></p>;
+    return (
+      <p className="text-sm text-success">
+        <strong>Payment confirmed. Thank you!</strong>
+      </p>
+    );
   }
 
   return (
-    <div>
-      <button onClick={pay} disabled={status === "opening" || status === "processing"}>
+    <div className="flex flex-col gap-2">
+      <Button onClick={pay} disabled={status === "opening" || status === "processing"} className="self-start">
         Pay {currency} {(Number(amountMinor) / 100).toFixed(2)}
-      </button>
-      {status === "processing" && <p>Payment received — confirming...</p>}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      </Button>
+      {status === "processing" && <p className="text-sm text-muted-foreground">Payment received — confirming…</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

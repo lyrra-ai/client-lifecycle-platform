@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function SlotPicker({ callId, slots }: { callId: string; slots: string[] }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -25,18 +26,18 @@ export function SlotPicker({ callId, slots }: { callId: string; slots: string[] 
   }
 
   if (picked) {
-    return <p>Confirmed for {new Date(picked).toLocaleString()}. See you then!</p>;
+    return <p className="text-sm text-success">Confirmed for {new Date(picked).toLocaleString()}. See you then!</p>;
   }
 
   return (
-    <div>
-      <p>Pick a time that works:</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">Pick a time that works:</p>
       {slots.map((slot) => (
-        <button key={slot} onClick={() => pick(slot)} disabled={busy} style={{ display: "block", marginBottom: 8 }}>
+        <Button key={slot} variant="outline" className="justify-start" onClick={() => pick(slot)} disabled={busy}>
           {new Date(slot).toLocaleString()}
-        </button>
+        </Button>
       ))}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

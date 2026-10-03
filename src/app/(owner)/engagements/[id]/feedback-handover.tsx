@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export interface FeedbackRequestRow {
   id: string;
@@ -41,25 +42,37 @@ export function FeedbackHandover({
   }
 
   return (
-    <div>
-      <h3>Feedback</h3>
-      {feedbackRequests.length === 0 && <p>No feedback requests yet.</p>}
-      <ul>
-        {feedbackRequests.map((r) => (
-          <li key={r.id}>
-            {new Date(r.sentAt).toLocaleDateString()} —{" "}
-            {r.response ? `${r.response.rating}/5${r.response.comments ? `: ${r.response.comments}` : ""}` : "awaiting response"}
-          </li>
-        ))}
-      </ul>
-      <button onClick={requestFeedback} disabled={busy}>Request Feedback</button>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        {feedbackRequests.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No feedback requests yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-1 text-sm">
+            {feedbackRequests.map((r) => (
+              <li key={r.id}>
+                {new Date(r.sentAt).toLocaleDateString()} —{" "}
+                {r.response ? `${r.response.rating}/5${r.response.comments ? `: ${r.response.comments}` : ""}` : "awaiting response"}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Button variant="outline" size="sm" className="self-start" onClick={requestFeedback} disabled={busy}>
+          Request Feedback
+        </Button>
+      </div>
 
-      <h3>Handover</h3>
-      {handoverPacketId ? (
-        <p><a href={`/handover-packets/${handoverPacketId}`}>Handover packet</a></p>
-      ) : (
-        <button onClick={createHandover} disabled={busy}>Create Handover Packet</button>
-      )}
+      <div className="flex flex-col gap-2 border-t pt-4">
+        <p className="text-sm font-medium">Handover</p>
+        {handoverPacketId ? (
+          <a href={`/handover-packets/${handoverPacketId}`} className="text-sm text-accent-foreground hover:underline">
+            Handover packet
+          </a>
+        ) : (
+          <Button variant="outline" size="sm" className="self-start" onClick={createHandover} disabled={busy}>
+            Create Handover Packet
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

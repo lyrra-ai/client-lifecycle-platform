@@ -6,6 +6,9 @@
  * it's the same underlying mechanism (System Design §4).
  */
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Step = "details" | "otp" | "done";
 
@@ -26,7 +29,11 @@ export function EsignFlow({ context }: { context: EsignContext }) {
   const [signedAt, setSignedAt] = useState<string | null>(null);
 
   if (!context.signable) {
-    return <p><em>This proposal can no longer be signed here.</em></p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        <em>This proposal can no longer be signed here.</em>
+      </p>
+    );
   }
 
   async function requestCode(e: React.FormEvent) {
@@ -68,52 +75,66 @@ export function EsignFlow({ context }: { context: EsignContext }) {
 
   if (step === "done") {
     return (
-      <div>
-        <h2>Signed</h2>
-        <p>Signed by {signerName} ({signerPhone})</p>
-        <p>Verified at {signedAt ? new Date(signedAt).toLocaleString() : ""}</p>
+      <div className="flex flex-col gap-1">
+        <h2 className="font-serif text-xl text-success">Signed</h2>
+        <p className="text-sm">
+          Signed by {signerName} ({signerPhone})
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Verified at {signedAt ? new Date(signedAt).toLocaleString() : ""}
+        </p>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-3">
       {step === "details" && (
-        <form onSubmit={requestCode}>
-          <input
-            placeholder="Your name"
-            value={signerName}
-            onChange={(e) => setSignerName(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", marginBottom: 8, padding: 8 }}
-          />
-          <input
-            placeholder="Your phone number"
-            value={signerPhone}
-            onChange={(e) => setSignerPhone(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", marginBottom: 8, padding: 8 }}
-          />
-          <button type="submit" disabled={submitting}>Send code</button>
+        <form onSubmit={requestCode} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="signerName">Your name</Label>
+            <Input
+              id="signerName"
+              placeholder="Your name"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="signerPhone">Your phone number</Label>
+            <Input
+              id="signerPhone"
+              placeholder="Your phone number"
+              value={signerPhone}
+              onChange={(e) => setSignerPhone(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={submitting} className="self-start">
+            Send code
+          </Button>
         </form>
       )}
 
       {step === "otp" && (
-        <form onSubmit={verify}>
-          <p>Enter the 6-digit code sent to {signerPhone}.</p>
-          <input
+        <form onSubmit={verify} className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">Enter the 6-digit code sent to {signerPhone}.</p>
+          <Input
             inputMode="numeric"
             maxLength={6}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
-            style={{ display: "block", width: "100%", marginBottom: 8, padding: 8 }}
+            className="w-32"
           />
-          <button type="submit" disabled={submitting}>Verify &amp; sign</button>
+          <Button type="submit" disabled={submitting} className="self-start">
+            Verify &amp; sign
+          </Button>
         </form>
       )}
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { FollowupRulesForm } from "./followup-rules-form";
 import { NotificationChannelForm } from "./notification-channel-form";
 import { IntegrationsStatus } from "./integrations-status";
 import { TeamMembersPanel } from "./team-members-panel";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SettingsPage() {
   const session = await getSession();
@@ -27,21 +28,53 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <main style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Settings</h1>
-      <BusinessProfileForm initial={settings} />
+    <div className="flex flex-col gap-6">
+      <h1 className="font-serif text-3xl">Settings</h1>
 
-      <h2>Notification channel</h2>
-      <NotificationChannelForm initial={settings.notificationChannel} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Business profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BusinessProfileForm initial={settings} />
+        </CardContent>
+      </Card>
 
-      <h2>Integrations</h2>
-      <IntegrationsStatus status={integrationStatus} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification channel</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NotificationChannelForm initial={settings.notificationChannel} />
+        </CardContent>
+      </Card>
 
-      <h2>Team members</h2>
-      <TeamMembersPanel initial={teamMembers} currentUserId={session.userId} isOwner={session.role === "owner"} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Integrations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <IntegrationsStatus status={integrationStatus} />
+        </CardContent>
+      </Card>
 
-      <h2>Follow-up cadence</h2>
-      <FollowupRulesForm initial={followUpRules} />
-    </main>
+      <Card>
+        <CardHeader>
+          <CardTitle>Team members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TeamMembersPanel initial={teamMembers} currentUserId={session.userId} isOwner={session.role === "owner"} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Follow-up cadence</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FollowupRulesForm initial={followUpRules} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

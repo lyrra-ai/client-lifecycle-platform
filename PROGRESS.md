@@ -458,6 +458,67 @@ brand-new tenant signup currently cannot complete today. Worked around
 it for screenshot purposes by seeding a tenant directly in Postgres
 rather than touching this code during a styling-only phase.
 
+## Iteration 20 (cont'd) — UI polish Phase 1 + Phase 2 — DONE
+
+Both remaining phases from the plan file (`groovy-beaming-sketch.md`)
+shipped in the same session as Phase 0, rather than stopping after the
+foundation. All 24 pages in the app now use the Flowdesk design system —
+no page left on the old inline-style markup.
+
+**Phase 1 (owner-side, 9 page groups):** Engagement detail (+ its 5 sub-
+components: OpenProposalButton, InvoiceList, AccessRequestList,
+ScheduleKickoff, FeedbackHandover), Leads (+ NewLeadForm, LeadRow),
+Settings (all 5 sub-forms: business profile, notification channel,
+integrations status, team members, follow-up cadence), and all 6 document
+editors (Proposal, Invoice, Welcome Doc, Intake Form, Kickoff Call,
+Handover Packet).
+
+**Phase 2 (public/client-facing, 11 pages):** New shared
+`src/components/public-shell.tsx` — lighter single-column shell (no owner
+sidebar, small "Flowdesk" wordmark header) per the plan's mobile-first
+rationale. Applied to: Proposal (`/p`), Invoice (`/i`), Pay (`/pay` + its
+Razorpay `Checkout` component), Welcome Doc (`/w`), Intake Form
+(`/intake`), Access checklist (`/access`), Kickoff scheduling
+(`/kickoff`), Feedback (`/feedback`), Handover (`/handover`), Client
+Portal (`/portal`), E-sign (`/esign`).
+
+Added shadcn components beyond Phase 0's set: `checkbox`, `radio-group`,
+`alert` (alert ended up unused — every error/empty state uses plain
+`<p>` text with `text-destructive`/`text-muted-foreground`, consistent
+with the rest of the system; left installed since it's zero-cost and
+likely wanted eventually).
+
+**Live-verified thoroughly, not just `tsc`/`npm test`:**
+- Full production `next build` — all 24 pages compile clean.
+- Full Vitest suite — 195/195 passing throughout, no service-layer logic
+  was touched (styling-only changes to `.tsx` markup/classes).
+- **Both Playwright e2e specs re-run against the restyled pages** (the
+  highest-risk check, since e-sign and payment depend on exact
+  selectors/text): `esign.spec.ts` — 2/2 passing, confirms the restyled
+  `EsignFlow` component's placeholders/button text/heading text all still
+  match what the spec asserts. `payment.spec.ts` — passed (after one retry
+  of the same pre-existing Razorpay-iframe UI flake documented in
+  iteration 19, confirmed via screenshot that the restyled `/pay/[id]`
+  page itself worked correctly and the flake is purely in Razorpay's own
+  external iframe).
+- Screenshotted a real multi-step flow end-to-end with real seeded data:
+  login → Leads → "Create Proposal" → Engagement detail → Proposal editor
+  → Client Portal link → Portal page showing the live timeline/documents.
+  Also Settings (all 5 cards) and the dashboard/engagements list at both
+  desktop and mobile width (mobile checked in Phase 0; same shell, so it
+  carries through).
+- A recurring "hydration mismatch" console warning
+  (`caret-color: transparent`) appears on every page with `<input>`
+  elements when driven by Playwright — confirmed this is a Playwright/
+  Chromium automation-only artifact (it appeared on the old plain-HTML
+  `<input>`s in Phase 0 testing too, before any shadcn components
+  existed), not a real bug a human visitor would ever see.
+
+**Not done — correctly out of scope, not an oversight:** the known
+first-time-signup OTP bug (documented above) was deliberately left alone
+again even though it was hit again during Phase 2 screenshot verification
+— still unrelated to styling, still belongs to whoever next touches auth.
+
 ## Notes for whoever (human or Claude) picks this up next
 
 - Don't re-derive the lifecycle state machine, tenant isolation pattern, or

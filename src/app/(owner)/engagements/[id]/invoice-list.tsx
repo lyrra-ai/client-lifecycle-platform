@@ -2,6 +2,27 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export interface InvoiceRow {
   id: string;
@@ -43,57 +64,96 @@ export function InvoiceList({ engagementId, invoices }: { engagementId: string; 
   }
 
   return (
-    <div>
-      <h3>Invoices</h3>
-      {invoices.length === 0 && <p>None yet.</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">Type</th>
-            <th align="left">Amount</th>
-            <th align="left">GST</th>
-            <th align="left">Status</th>
-            <th align="left"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoices.map((inv) => (
-            <tr key={inv.id}>
-              <td>{inv.type}</td>
-              <td>{inv.currency} {inv.amount.toFixed(2)}</td>
-              <td>{inv.gstApplicable ? "yes" : "no"}</td>
-              <td>{inv.status}</td>
-              <td><a href={`/invoices/${inv.id}`}>Open</a></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-3">
+      {invoices.length === 0 ? (
+        <p className="text-sm text-muted-foreground">None yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>GST</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices.map((inv) => (
+              <TableRow key={inv.id}>
+                <TableCell className="capitalize">{inv.type}</TableCell>
+                <TableCell className="font-mono">
+                  {inv.currency} {inv.amount.toFixed(2)}
+                </TableCell>
+                <TableCell>{inv.gstApplicable ? "Yes" : "No"}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{inv.status}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link href={`/invoices/${inv.id}`} className="text-accent-foreground hover:underline">
+                    Open
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {!open ? (
-        <button onClick={() => setOpen(true)}>+ Add milestone/final invoice</button>
+        <Button variant="outline" size="sm" className="self-start" onClick={() => setOpen(true)}>
+          + Add milestone/final invoice
+        </Button>
       ) : (
-        <form onSubmit={addInvoice} style={{ border: "1px solid #ccc", padding: 12, marginTop: 8 }}>
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="milestone">Milestone</option>
-            <option value="final">Final</option>
-          </select>
-          <input
-            type="number"
-            placeholder="Amount"
-            value={amountMajor}
-            onChange={(e) => setAmountMajor(Number(e.target.value))}
-          />
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-            <option value="INR">INR</option>
-            <option value="USD">USD</option>
-          </select>
-          <label>
-            <input type="checkbox" checked={gstApplicable} onChange={(e) => setGstApplicable(e.target.checked)} />
-            GST applicable
-          </label>
-          <button type="submit" disabled={busy}>Create</button>
-          <button type="button" onClick={() => setOpen(false)}>Cancel</button>
-          {error && <p style={{ color: "crimson" }}>{error}</p>}
+        <form onSubmit={addInvoice} className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="final">Final</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Amount</Label>
+              <Input
+                type="number"
+                className="w-32"
+                value={amountMajor}
+                onChange={(e) => setAmountMajor(Number(e.target.value))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INR">INR</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Label className="flex items-center gap-2 pb-2">
+              <Checkbox checked={gstApplicable} onCheckedChange={(v) => setGstApplicable(Boolean(v))} />
+              GST applicable
+            </Label>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={busy}>
+              Create
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
       )}
     </div>

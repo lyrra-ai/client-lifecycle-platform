@@ -2,6 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export interface AccessRequestRow {
   id: string;
@@ -65,60 +78,77 @@ export function AccessRequestList({
   }
 
   return (
-    <div>
-      <h3>Access Requests</h3>
-      {requests.length === 0 && <p>None yet.</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">Platform</th>
-            <th align="left">Status</th>
-            <th align="left"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((r) => (
-            <tr key={r.id}>
-              <td>{r.platform}</td>
-              <td>{r.status}</td>
-              <td>
-                {r.status === "requested" && (
-                  <>
-                    <button onClick={() => setStatus(r.id, "granted")} disabled={busy}>Mark granted</button>{" "}
-                    <button onClick={() => setStatus(r.id, "na")} disabled={busy}>N/A</button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-3">
+      {requests.length === 0 ? (
+        <p className="text-sm text-muted-foreground">None yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Platform</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requests.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell>{r.platform}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{r.status}</Badge>
+                </TableCell>
+                <TableCell className="flex gap-2">
+                  {r.status === "requested" && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "granted")} disabled={busy}>
+                        Mark granted
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setStatus(r.id, "na")} disabled={busy}>
+                        N/A
+                      </Button>
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {requests.length > 0 && (
-        <p>
-          <a href={`/access/${engagementPublicToken}`}>View client checklist link</a>
-        </p>
+        <a href={`/access/${engagementPublicToken}`} className="text-sm text-accent-foreground hover:underline">
+          View client checklist link
+        </a>
       )}
 
       {!open ? (
-        <button onClick={() => setOpen(true)}>+ Request access</button>
+        <Button variant="outline" size="sm" className="self-start" onClick={() => setOpen(true)}>
+          + Request access
+        </Button>
       ) : (
-        <div style={{ border: "1px solid #ccc", padding: 12, marginTop: 8 }}>
-          {platformLibrary.map((name) => (
-            <label key={name} style={{ display: "block" }}>
-              <input type="checkbox" checked={selected.includes(name)} onChange={() => toggle(name)} />
-              {name}
-            </label>
-          ))}
-          <input
-            placeholder="Other platform..."
+        <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+          <div className="flex flex-col gap-2">
+            {platformLibrary.map((name) => (
+              <Label key={name} className="flex items-center gap-2">
+                <Checkbox checked={selected.includes(name)} onCheckedChange={() => toggle(name)} />
+                {name}
+              </Label>
+            ))}
+          </div>
+          <Input
+            placeholder="Other platform…"
             value={customPlatform}
             onChange={(e) => setCustomPlatform(e.target.value)}
-            style={{ display: "block", marginTop: 8 }}
           />
-          <button onClick={requestAccess} disabled={busy} style={{ marginTop: 8 }}>Request access</button>{" "}
-          <button onClick={() => setOpen(false)}>Cancel</button>
-          {error && <p style={{ color: "crimson" }}>{error}</p>}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={requestAccess} disabled={busy}>
+              Request access
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       )}
     </div>

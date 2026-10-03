@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function DeclineButton({ proposalId }: { proposalId: string }) {
   const router = useRouter();
@@ -15,8 +16,8 @@ export function DeclineButton({ proposalId }: { proposalId: string }) {
   }
 
   return (
-    <button onClick={decline} disabled={busy}>
+    <Button variant="outline" onClick={decline} disabled={busy}>
       Decline
-    </button>
+    </Button>
   );
 }

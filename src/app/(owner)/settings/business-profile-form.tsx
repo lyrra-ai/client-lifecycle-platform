@@ -7,6 +7,10 @@
  * a separate, later iteration.
  */
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface SettingsData {
   businessName: string;
@@ -20,50 +24,52 @@ export function BusinessProfileForm({ initial }: { initial: SettingsData }) {
   const [gstNumber, setGstNumber] = useState(initial.gstNumber ?? "");
   const [state, setState] = useState(initial.state ?? "");
   const [defaultDepositPercent, setDefaultDepositPercent] = useState(initial.defaultDepositPercent);
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMessage(null);
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gstNumber, state, defaultDepositPercent }),
     });
     setBusy(false);
-    setMessage(res.ok ? "Saved." : "Couldn't save.");
+    toast(res.ok ? "Saved." : "Couldn't save.");
   }
 
   return (
-    <form onSubmit={save} style={{ maxWidth: 400 }}>
-      <p>{initial.businessName} &middot; {initial.defaultCurrency}</p>
+    <form onSubmit={save} className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        {initial.businessName} · {initial.defaultCurrency}
+      </p>
 
-      <label>
-        GST number (leave blank if not registered)
-        <input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} style={{ display: "block", width: "100%", marginBottom: 8 }} />
-      </label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="gstNumber">GST number (leave blank if not registered)</Label>
+        <Input id="gstNumber" value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} />
+      </div>
 
-      <label>
-        Business state (needed to compute CGST/SGST vs IGST)
-        <input value={state} onChange={(e) => setState(e.target.value)} style={{ display: "block", width: "100%", marginBottom: 8 }} />
-      </label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="businessState">Business state (needed to compute CGST/SGST vs IGST)</Label>
+        <Input id="businessState" value={state} onChange={(e) => setState(e.target.value)} />
+      </div>
 
-      <label>
-        Default deposit percentage
-        <input
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="depositPercent">Default deposit percentage</Label>
+        <Input
+          id="depositPercent"
           type="number"
           min={1}
           max={100}
+          className="w-32"
           value={defaultDepositPercent}
           onChange={(e) => setDefaultDepositPercent(Number(e.target.value))}
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
         />
-      </label>
+      </div>
 
-      <button type="submit" disabled={busy}>Save</button>
-      {message && <span style={{ marginLeft: 8 }}>{message}</span>}
+      <Button type="submit" disabled={busy} className="self-start">
+        Save
+      </Button>
     </form>
   );
 }

@@ -2,48 +2,36 @@
 
 /** PRD §15/§12: "channel preference (WhatsApp-first vs. email-first)". */
 import { useState } from "react";
+import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export function NotificationChannelForm({ initial }: { initial: "whatsapp_first" | "email_first" }) {
   const [channel, setChannel] = useState(initial);
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function save(value: "whatsapp_first" | "email_first") {
-    setChannel(value);
+  async function save(value: string) {
+    setChannel(value as "whatsapp_first" | "email_first");
     setBusy(true);
-    setMessage(null);
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationChannel: value }),
     });
     setBusy(false);
-    setMessage(res.ok ? "Saved." : "Couldn't save.");
+    toast(res.ok ? "Saved." : "Couldn't save.");
   }
 
   return (
-    <div style={{ maxWidth: 400, marginBottom: 24 }}>
-      <label style={{ display: "block", marginBottom: 4 }}>
-        <input
-          type="radio"
-          name="channel"
-          checked={channel === "whatsapp_first"}
-          disabled={busy}
-          onChange={() => save("whatsapp_first")}
-        />{" "}
+    <RadioGroup value={channel} onValueChange={save} disabled={busy} className="gap-3">
+      <Label className="flex items-center gap-2 font-normal">
+        <RadioGroupItem value="whatsapp_first" />
         WhatsApp first, fall back to email
-      </label>
-      <label style={{ display: "block" }}>
-        <input
-          type="radio"
-          name="channel"
-          checked={channel === "email_first"}
-          disabled={busy}
-          onChange={() => save("email_first")}
-        />{" "}
+      </Label>
+      <Label className="flex items-center gap-2 font-normal">
+        <RadioGroupItem value="email_first" />
         Email first, fall back to WhatsApp
-      </label>
-      {message && <span style={{ marginLeft: 8 }}>{message}</span>}
-    </div>
+      </Label>
+    </RadioGroup>
   );
 }
