@@ -224,19 +224,70 @@ Account Quality review cleared faster than the ~3 day estimate. App
    (Meta's own policies may require explicit opt-in tracking for template
    messages at scale).
 
+## Iteration 18 — Settings sub-items — PARTIALLY DONE
+
+**What's implemented and live-verified (real dev server + real dev DB, not just tests):**
+- `src/services/settings/index.ts` extended: `getIntegrationStatus`
+  (read-only Razorpay/WhatsApp/email "configured" flags from env presence),
+  `listTeamMembers` / `inviteTeamMember` / `removeTeamMember`.
+- `Tenant.notificationChannel` now editable from Settings (ties into
+  iteration 17's WhatsApp-first/email-first channel preference) via
+  `NotificationChannelForm` — previously only settable by direct DB edit.
+- Team member management: list/add/remove `User` rows under the tenant.
+  No invite-link flow needed — login is email+OTP
+  (`src/app/api/auth/verify-otp/route.ts`), so a pre-created `User` row
+  just logs in with the usual email code. Guards: can't remove yourself,
+  can't remove the only remaining owner, refuses to add an email already
+  registered under a *different* tenant (login resolves a user by email
+  alone, not (tenantId, email) — see the service docstring for why that
+  collision has to be refused rather than silently allowed). Owner-only for
+  add/remove (403 for a `team_member` role); any member can view the list.
+  Removing a member also revokes their active sessions.
+- New routes: `GET /api/settings/integrations`,
+  `GET`/`POST /api/settings/team-members`,
+  `DELETE /api/settings/team-members/[id]`; `PUT /api/settings` extended
+  to accept `notificationChannel`.
+- New UI: `notification-channel-form.tsx`, `integrations-status.tsx`,
+  `team-members-panel.tsx`, wired into `settings/page.tsx`.
+- Tests: `tests/integration/settings.test.ts` (10 cases). Full suite:
+  **195/195 passing**, `tsc --noEmit` clean, `next build` clean.
+- Live-verified in the browser's place (curl against a real logged-in
+  session on the dev server + real dev Postgres): fetched the rendered
+  Settings page and confirmed all 4 new sections render; exercised every
+  new endpoint for real — integration status, add/list/remove a team
+  member, self-removal guard, last-owner guard, and switching the channel
+  preference to `whatsapp_first` — then cleaned up the smoke-test tenant.
+
+**Explicitly NOT done this iteration — see service module docstring and TODOs below:**
+- **Razorpay/WhatsApp connection UI** is read-only status, not a live
+  credential-entry form. Both providers are still single, platform-wide env
+  vars (`RAZORPAY_KEY_ID`/`SECRET`, `WHATSAPP_PROVIDER_API_KEY`/etc.), not
+  per-tenant — there's nothing per-tenant to store yet. Building real
+  per-tenant credential storage (encryption at rest, `getRazorpayClient()`/
+  `sendWhatsAppMessage()` switched to read from the tenant row instead of
+  `process.env`) is real architecture work, and the PRD itself frames this
+  as relevant once there are *outside* tenants — v1 is dogfooding on one
+  real tenant (the founder's own business). Building it now would be
+  speculative. Revisit when a second real tenant actually needs it.
+- **Configurable templates/question-library seeds** not built at all — no
+  "service type" concept exists anywhere in the schema (`Lead`/`Engagement`
+  have no such field), so "seeds per service type" needs a product decision
+  on what's actually configurable before there's anything to build. Ask the
+  user for concrete scope before attempting this.
+
 ## Still next up, in the user's explicit stated order
 
-1. **Settings sub-items**: team member management UI, Razorpay/WhatsApp
-   connection UI (incl. the channel-preference toggle above), configurable
-   templates/question-library seeds.
-2. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
+1. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
    CI pipeline.
-3. Deferred to the very end, only if/when the user asks:
+2. Deferred to the very end, only if/when the user asks:
    - **PRD §16** out-of-scope items.
    - **PRD §17** open questions: product/brand name, follow-up cadence
      tuning (currently PRD's proposed 2/5/9 default), external-tenant
      pricing model. (WhatsApp provider choice is now resolved: direct Meta
      Cloud API.)
+   - Per-tenant Razorpay/WhatsApp credentials and configurable template
+     seeds (see iteration 18's "explicitly NOT done" above) — only once
+     there's a concrete second tenant or explicit product direction.
 
 ## Notes for whoever (human or Claude) picks this up next
 

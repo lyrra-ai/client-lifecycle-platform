@@ -7,6 +7,7 @@ const bodySchema = z.object({
   gstNumber: z.string().trim().optional().or(z.literal("")),
   state: z.string().trim().optional().or(z.literal("")),
   defaultDepositPercent: z.number().int().min(1).max(100).optional(),
+  notificationChannel: z.enum(["whatsapp_first", "email_first"]).optional(),
 });
 
 export async function GET() {
@@ -26,11 +27,12 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Invalid settings." }, { status: 400 });
   }
 
-  const { gstNumber, state, defaultDepositPercent } = parsed.data;
+  const { gstNumber, state, defaultDepositPercent, notificationChannel } = parsed.data;
   const settings = await updateTenantSettings(requireTenantContext(session), {
     gstNumber: gstNumber || null,
     state: state || null,
     defaultDepositPercent,
+    notificationChannel,
   });
   return NextResponse.json({ settings });
 }
