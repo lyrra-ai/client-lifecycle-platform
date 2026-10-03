@@ -275,11 +275,85 @@ Account Quality review cleared faster than the ~3 day estimate. App
   on what's actually configurable before there's anything to build. Ask the
   user for concrete scope before attempting this.
 
+## Iteration 19 — Testing gaps — DONE
+
+**Playwright e2e — `tests/e2e/esign.spec.ts` added (2 specs):**
+- Drives the real e-sign UI (`src/app/esign/[id]/esign-flow.tsx`) through an
+  actual browser — details -> OTP -> signed. Genuine multi-step client-side
+  JS the Vitest integration suite can't reach (it only calls service
+  functions, never renders a React component), same rationale as
+  `payment.spec.ts`. Reads the dev-mode OTP code straight from the real dev
+  DB (`otp_codes` table, same mechanism `src/lib/otp.ts` already logs for
+  login) rather than scraping server stdout, which this test process has no
+  handle on.
+- Covers the happy path (signs successfully, `Proposal.status` ->
+  `accepted`, `EsignEvent` created, deposit invoice auto-drafts per PRD §6)
+  and the wrong-code path (rejected, proposal stays `viewed`, nothing
+  signed).
+- Added `seedViewedProposal()` to `tests/e2e/seed.ts` alongside the
+  existing `seedSentInvoiceWithRealOrder()`.
+- Live-verified for real: ran against the actual dev server + dev DB, both
+  specs pass consistently.
+- Deliberately NOT added: broader coverage of every owner-side editor page
+  (proposal/invoice/welcome-doc/etc.) — per the README's own stated e2e
+  philosophy ("kept to a handful of high-value golden paths, not broad
+  coverage — that stays at the integration layer"), only flows with real
+  third-party UI or genuine multi-step client JS belong here. Most editor
+  pages are plain CRUD forms already covered server-side by the 195
+  Vitest tests; adding Playwright coverage for those would just be the
+  same assertions run slower, not new coverage.
+
+**Found and fixed a real pre-existing bug while running `payment.spec.ts`
+for regression-checking (not introduced this iteration, but fixed since it
+was directly in a file this work touched):** `tests/e2e/seed.ts`'s
+`cleanupTenant()` was missing deletes for `follow_up_tasks`,
+`welcome_docs`, `intake_forms`, `access_requests`, `kickoff_calls`,
+`call_summaries`, `feedback_requests`/`feedback_responses`, and
+`handover_packets` — any of those existing (e.g. `cancelFollowUpTask` only
+flips status, never deletes the row; a real completed payment
+auto-creates a `WelcomeDoc` + `IntakeForm` per PRD §8/§9) caused an FK
+violation on the `afterEach` cleanup, which would have been silently
+corrupting the dev DB with orphaned Playwright rows on every real e2e run
+going forward. Rewrote `cleanupTenant()` to delete every engagement-scoped
+child table in dependency order (same order as `tests/setup/reset-db.ts`'s
+`TABLES` list), then manually cleaned up 2 orphaned tenants this bug had
+already left behind. `payment.spec.ts` itself needed no changes.
+
+**Known pre-existing flakiness, not something to chase further right now:**
+`payment.spec.ts` drives Razorpay's *real* hosted Checkout.js — an iframe
+this project doesn't control. Across several runs during this iteration it
+failed intermittently on different UI-timing steps (once on the mobile
+field, once on the OTP field) despite no code changes, then passed
+cleanly on retry both times, and cleanup succeeded correctly even on the
+failed runs. This is inherent to driving a real third-party UI, documented
+in the spec's own comments already — rerun once before assuming a
+regression.
+
+**CI pipeline added:** `.github/workflows/ci.yml` — runs on every push/PR
+to `main`: `npm ci` -> `prisma generate` -> `npm run typecheck` -> `npm
+test` (unit + integration), against a `postgres:16-alpine` service
+container mapped to port 55433 to match `vitest.config.ts`'s hardcoded
+`TEST_DATABASE_URL` (no source change needed). No secrets required — every
+provider call site already falls back gracefully when a key is unset (same
+behavior this repo's own `.env` already relies on locally with an empty
+`ANTHROPIC_API_KEY`). e2e is deliberately **not** run in CI — needs real
+credentials and a live dev server; stays local-only
+(`npm run test:e2e`), per README. Not yet verified against a real GitHub
+Actions run (no `act` tool available locally to simulate it) — the first
+real push to `main` is the live proof; check the Actions tab after this
+commit lands.
+
+**README's Testing section updated:** added the CI row, corrected an
+inaccurate claim that Anthropic/email/WhatsApp are "mocked... never hit
+for real" at the integration layer (only Razorpay actually is, via
+`vi.mock` in `tests/integration/payments.test.ts` — the others hit real
+APIs with a graceful dev-mode fallback, which is how `174/195`-ish of
+these tests already behaved before this iteration too), and noted
+`payment.spec.ts`'s known UI-timing flakiness.
+
 ## Still next up, in the user's explicit stated order
 
-1. **Testing gaps**: broader Playwright e2e coverage beyond `payment.spec.ts`,
-   CI pipeline.
-2. Deferred to the very end, only if/when the user asks:
+1. Deferred to the very end, only if/when the user asks:
    - **PRD §16** out-of-scope items.
    - **PRD §17** open questions: product/brand name, follow-up cadence
      tuning (currently PRD's proposed 2/5/9 default), external-tenant
