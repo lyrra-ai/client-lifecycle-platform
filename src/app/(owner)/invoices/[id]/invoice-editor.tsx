@@ -27,7 +27,7 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
   const [gstApplicable, setGstApplicable] = useState(initial.gstApplicable);
   const [dueDate, setDueDate] = useState(initial.dueDate?.slice(0, 10) ?? "");
   const [busy, setBusy] = useState(false);
-  const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean } | null>(null);
+  const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean; whatsapped: boolean } | null>(null);
 
   const isDraft = initial.status === "draft";
 
@@ -58,7 +58,7 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
       toast(data.error ?? "Couldn't send.");
       return;
     }
-    setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed });
+    setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed, whatsapped: data.whatsapped });
     router.refresh();
   }
 
@@ -159,7 +159,12 @@ export function InvoiceEditor({ initial }: { initial: EditorInvoice }) {
 
       {sentInfo && (
         <p className="text-sm text-muted-foreground">
-          Sent. {sentInfo.emailed ? "Emailed to the client." : "Email not configured — share this link manually:"}{" "}
+          Sent.{" "}
+          {sentInfo.whatsapped
+            ? "Sent via WhatsApp."
+            : sentInfo.emailed
+              ? "Emailed to the client."
+              : "Neither channel is configured — share this link manually:"}{" "}
           <a href={sentInfo.publicUrl} className="text-accent-foreground hover:underline">
             {sentInfo.publicUrl}
           </a>

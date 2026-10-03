@@ -88,7 +88,12 @@ export function HandoverEditor({ initial }: { initial: EditorHandoverPacket }) {
       toast(data.error ?? "Couldn't send.");
       return;
     }
-    toast(`Sent. ${data.emailed ? "Emailed to the client." : "Share this link manually: " + data.publicUrl}`);
+    const channelMessage = data.whatsapped
+      ? "Sent via WhatsApp."
+      : data.emailed
+        ? "Emailed to the client."
+        : "Neither channel is configured — share this link manually: " + data.publicUrl;
+    toast(`Sent. ${channelMessage}`);
     router.refresh();
   }
 

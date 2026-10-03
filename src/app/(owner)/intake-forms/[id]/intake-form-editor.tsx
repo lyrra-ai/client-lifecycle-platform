@@ -28,7 +28,7 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
   const router = useRouter();
   const [questions, setQuestions] = useState<EditorQuestion[]>(initial.questions);
   const [busy, setBusy] = useState(false);
-  const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean } | null>(null);
+  const [sentInfo, setSentInfo] = useState<{ publicUrl: string; emailed: boolean; whatsapped: boolean } | null>(null);
 
   function update(i: number, patch: Partial<EditorQuestion>) {
     setQuestions((qs) => qs.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
@@ -92,7 +92,7 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
       toast(data.error ?? "Couldn't send.");
       return;
     }
-    setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed });
+    setSentInfo({ publicUrl: data.publicUrl, emailed: data.emailed, whatsapped: data.whatsapped });
     router.refresh();
   }
 
@@ -151,7 +151,12 @@ export function IntakeFormEditor({ initial }: { initial: EditorIntakeForm }) {
 
       {sentInfo && (
         <p className="text-sm text-muted-foreground">
-          Sent. {sentInfo.emailed ? "Emailed to the client." : "Email not configured — share this link manually:"}{" "}
+          Sent.{" "}
+          {sentInfo.whatsapped
+            ? "Sent via WhatsApp."
+            : sentInfo.emailed
+              ? "Emailed to the client."
+              : "Neither channel is configured — share this link manually:"}{" "}
           <a href={sentInfo.publicUrl} className="text-accent-foreground hover:underline">
             {sentInfo.publicUrl}
           </a>
