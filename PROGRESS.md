@@ -585,12 +585,28 @@ explicit ask.
   token echoes the challenge, wrong token gets 403). 8 new unit tests
   (`tests/unit/whatsapp-webhook.test.ts`) cover both handlers with real
   HMAC signatures, including a tampered-body-stale-signature case.
-- **Not yet live-tested against Meta itself** — that needs `ngrok http
-  3000` (installed, confirmed in PATH) and pasting the resulting public
-  URL + the verify token into Meta's dashboard
-  (WhatsApp → Configuration → Webhook), which is a manual step only the
-  user can do in their own browser session, same as every other Meta
-  dashboard step so far in this project.
+- **Live-tested against Meta itself, same day, and it works.** User ran
+  `ngrok http 3000`, registered `https://<ngrok-subdomain>.ngrok-free.dev/api/webhooks/whatsapp`
+  + the verify token in Meta's dashboard (WhatsApp → Configuration →
+  Webhook), subscribed to the `messages` field, and clicked Meta's own
+  "Test" → "Send to Server" button. Confirmed in the dev server log:
+  - The real verification handshake (not our test's synthetic one) hit
+    `GET /api/webhooks/whatsapp` and got `200`, matching the dashboard's
+    green "Verified" state.
+  - The real signed test event hit `POST /api/webhooks/whatsapp`, passed
+    real `X-Hub-Signature-256` verification against the real
+    `WHATSAPP_APP_SECRET`, and logged
+    `[whatsapp webhook] inbound message from 16315551181: this is a text message`,
+    then returned `200`.
+  - `WHATSAPP_APP_SECRET` is now set for real in `.env` (user provided it
+    from Meta App Dashboard → Settings → Basic).
+  - Note: Meta's dashboard warns that *real* production webhook events
+    (not the dashboard's synthetic "Test" button) won't deliver until the
+    app is published — the mechanics are proven, but an actual client
+    message/delivery-receipt flowing through hasn't been tried yet. Also,
+    ngrok's free-tier URL is not stable across restarts — whoever resumes
+    local webhook testing later will need to regenerate it and re-paste
+    into Meta's dashboard, the verify token itself doesn't need to change.
 
 ## Notes for whoever (human or Claude) picks this up next
 
