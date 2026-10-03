@@ -1,6 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface DashboardEngagementRow {
   id: string;
@@ -10,38 +27,59 @@ export interface DashboardEngagementRow {
   updatedAt: string;
 }
 
+const ALL_STAGES = "__all__";
+
 export function EngagementList({ engagements }: { engagements: DashboardEngagementRow[] }) {
-  const [stageFilter, setStageFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState(ALL_STAGES);
   const stages = Array.from(new Set(engagements.map((e) => e.stage))).sort();
-  const visible = stageFilter ? engagements.filter((e) => e.stage === stageFilter) : engagements;
+  const visible = stageFilter === ALL_STAGES ? engagements : engagements.filter((e) => e.stage === stageFilter);
 
   return (
-    <div>
-      <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-        <option value="">All stages</option>
-        {stages.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-        <thead>
-          <tr>
-            <th align="left">Client</th>
-            <th align="left">Stage</th>
-            <th align="left">Updated</th>
-            <th align="left"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((e) => (
-            <tr key={e.id}>
-              <td>{e.clientName}</td>
-              <td>{e.stage}</td>
-              <td>{new Date(e.updatedAt).toLocaleDateString()}</td>
-              <td><a href={`/engagements/${e.id}`}>Open</a></td>
-            </tr>
+    <div className="flex flex-col gap-3">
+      <Select value={stageFilter} onValueChange={setStageFilter}>
+        <SelectTrigger className="w-48">
+          <SelectValue placeholder="All stages" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_STAGES}>All stages</SelectItem>
+          {stages.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s.replace(/_/g, " ")}
+            </SelectItem>
           ))}
-        </tbody>
-      </table>
-      {visible.length === 0 && <p>No engagements{stageFilter ? ` at ${stageFilter}` : ""}.</p>}
+        </SelectContent>
+      </Select>
+
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No engagements{stageFilter !== ALL_STAGES ? ` at ${stageFilter}` : ""}.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Client</TableHead>
+              <TableHead>Stage</TableHead>
+              <TableHead>Updated</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visible.map((e) => (
+              <TableRow key={e.id}>
+                <TableCell className="font-medium">{e.clientName}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{e.stage.replace(/_/g, " ")}</Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{new Date(e.updatedAt).toLocaleDateString()}</TableCell>
+                <TableCell className="text-right">
+                  <Link href={`/engagements/${e.id}`} className="text-accent-foreground hover:underline">
+                    Open
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }

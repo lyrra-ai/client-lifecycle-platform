@@ -7,6 +7,10 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Step = "email" | "otp" | "business-name";
 
@@ -58,75 +62,89 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <h1>Sign in</h1>
+    <main className="flex min-h-screen items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="font-serif text-2xl">Flowdesk</CardTitle>
+          <CardDescription>
+            {step === "email" && "Sign in to your workspace"}
+            {step === "otp" && `Enter the 6-digit code sent to ${email}`}
+            {step === "business-name" && "First time here — what's your business called?"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {step === "email" && (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                requestOtp();
+              }}
+            >
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@business.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Button type="submit" disabled={submitting}>
+                Send code
+              </Button>
+            </form>
+          )}
 
-      {step === "email" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            requestOtp();
-          }}
-        >
-          <input
-            type="email"
-            placeholder="you@business.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: "100%", padding: 8, marginBottom: 8 }}
-          />
-          <button type="submit" disabled={submitting} style={{ width: "100%", padding: 8 }}>
-            Send code
-          </button>
-        </form>
-      )}
+          {step === "otp" && (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                verifyOtp();
+              }}
+            >
+              <Label htmlFor="code">Verification code</Label>
+              <Input
+                id="code"
+                inputMode="numeric"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                maxLength={6}
+                required
+              />
+              <Button type="submit" disabled={submitting}>
+                Verify
+              </Button>
+            </form>
+          )}
 
-      {step === "otp" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            verifyOtp();
-          }}
-        >
-          <p>Enter the 6-digit code sent to {email}.</p>
-          <input
-            inputMode="numeric"
-            placeholder="123456"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            maxLength={6}
-            required
-            style={{ width: "100%", padding: 8, marginBottom: 8 }}
-          />
-          <button type="submit" disabled={submitting} style={{ width: "100%", padding: 8 }}>
-            Verify
-          </button>
-        </form>
-      )}
+          {step === "business-name" && (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                verifyOtp(businessName);
+              }}
+            >
+              <Label htmlFor="businessName">Business name</Label>
+              <Input
+                id="businessName"
+                placeholder="Your business name"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                required
+              />
+              <Button type="submit" disabled={submitting}>
+                Create workspace
+              </Button>
+            </form>
+          )}
 
-      {step === "business-name" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            verifyOtp(businessName);
-          }}
-        >
-          <p>First time here — what's your business called?</p>
-          <input
-            placeholder="Your business name"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-            required
-            style={{ width: "100%", padding: 8, marginBottom: 8 }}
-          />
-          <button type="submit" disabled={submitting} style={{ width: "100%", padding: 8 }}>
-            Create workspace
-          </button>
-        </form>
-      )}
-
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        </CardContent>
+      </Card>
     </main>
   );
 }

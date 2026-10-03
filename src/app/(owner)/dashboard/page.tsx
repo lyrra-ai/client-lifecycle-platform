@@ -9,6 +9,7 @@ import { listEngagementsForDashboard, getRecentActivity } from "@/services/engag
 import { getOutstandingInvoicesTotal } from "@/services/billing";
 import { FollowupList } from "./followup-list";
 import { EngagementList } from "./engagement-list";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -23,38 +24,67 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Dashboard</h1>
+    <div className="flex flex-col gap-6">
+      <h1 className="font-serif text-3xl">Dashboard</h1>
 
-      <h2>Needs Follow-up</h2>
-      <FollowupList tasks={tasks} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Needs follow-up</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FollowupList tasks={tasks} />
+        </CardContent>
+      </Card>
 
-      <h2>Outstanding</h2>
-      {Object.keys(outstanding).length === 0 ? (
-        <p>Nothing outstanding.</p>
-      ) : (
-        <ul>
-          {Object.entries(outstanding).map(([currency, minor]) => (
-            <li key={currency}>{currency} {(Number(minor) / 100).toFixed(2)} owed across unpaid invoices</li>
-          ))}
-        </ul>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Outstanding</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {Object.keys(outstanding).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing outstanding.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {Object.entries(outstanding).map(([currency, minor]) => (
+                <li key={currency} className="font-mono text-sm">
+                  {currency} {(Number(minor) / 100).toFixed(2)} owed across unpaid invoices
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      <h2>Engagements</h2>
-      <EngagementList engagements={engagements} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Engagements</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EngagementList engagements={engagements} />
+        </CardContent>
+      </Card>
 
-      <h2>Recent activity</h2>
-      {activity.length === 0 ? (
-        <p>Nothing yet.</p>
-      ) : (
-        <ul>
-          {activity.map((item, i) => (
-            <li key={i}>
-              <a href={`/engagements/${item.engagementId}`}>{item.label}</a> — {new Date(item.at).toLocaleString()}
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {activity.map((item, i) => (
+                <li key={i} className="text-sm">
+                  <a href={`/engagements/${item.engagementId}`} className="text-accent-foreground hover:underline">
+                    {item.label}
+                  </a>{" "}
+                  <span className="text-muted-foreground">— {new Date(item.at).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

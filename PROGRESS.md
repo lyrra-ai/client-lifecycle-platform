@@ -378,6 +378,86 @@ these tests already behaved before this iteration too), and noted
      seeds (see iteration 18's "explicitly NOT done" above) — only once
      there's a concrete second tenant or explicit product direction.
 
+## Iteration 20 — Product named "Flowdesk" + UI polish Phase 0 — DONE
+
+PRD §17's "product/brand name" open question is resolved: **Flowdesk**.
+Root metadata (`src/app/layout.tsx`) updated from the old placeholder
+"Client Lifecycle Platform".
+
+User asked for a full "AI SaaS" visual polish pass across every page.
+Plan (full phased plan, design tokens, rationale) is in
+`C:\Users\abish\.claude\plans\groovy-beaming-sketch.md` — re-read it before
+starting Phase 1/2. Summary of decisions locked with the user:
+- Stack: **Tailwind CSS v4 + shadcn/ui** (Radix-based primitives — see
+  gotcha below).
+- Visual reference: Notion/Resend — warm, friendly, not clinical.
+- Palette/typography: extracted directly from **lyrra.co.in**'s compiled
+  CSS (itself inspired by nontechnical.dev): warm cream `canvas`
+  (`#efe9dc`)/`paper` (`#f5f4ed`) backgrounds, vivid orange `accent`
+  (`#f7591f`), Geist (sans/mono) + Instrument Serif (display) typography.
+  Full token table is in the plan file. Both light AND dark variants are
+  defined in `src/app/globals.css` (dark follows OS preference, no manual
+  toggle built yet — cheap to add later since both palettes already
+  exist).
+- Rollout: shared app shell + design system first (this iteration), then
+  every remaining page in later iterations (Phase 1 owner-side, Phase 2
+  public/client-facing — see plan file for the full page list).
+
+**What shipped (Phase 0):**
+- Tailwind v4 + shadcn/ui installed (`components.json`, Radix base, Nova
+  preset). Core components pulled in: Button, Card, Input, Label, Table,
+  Badge, DropdownMenu, Avatar, Separator, Sonner (toast), Dialog, Sheet,
+  Sidebar, Tooltip, Skeleton, Select, Textarea.
+- Fonts self-hosted via `next/font`: Geist + Geist Mono (the `geist` npm
+  package), Instrument Serif (`next/font/google`).
+- **Owner app shell built from scratch** — `src/app/(owner)/layout.tsx`
+  was previously *just* an auth-redirect guard with zero navigation
+  between Dashboard/Engagements/Leads/Settings (you had to type URLs
+  manually). Now: `src/components/app-sidebar.tsx` (nav + active-route
+  highlighting) + `src/components/app-topbar.tsx` (business name, user
+  avatar/email, sign-out), using shadcn's `Sidebar` block (handles mobile
+  collapse automatically, verified in a real mobile-width screenshot).
+- **Fixed `src/app/(owner)/engagements/page.tsx`** — it was a literal
+  scaffold stub (`<h1>Engagements</h1>`, no data at all). Now reuses the
+  existing `listEngagementsForDashboard` service function (same one the
+  dashboard already used) and renders a real filterable table.
+- Restyled: Login, Dashboard (+ its `EngagementList`/`FollowupList`
+  sub-components), Engagements list. Settings and every other owner/public
+  page are untouched (Phase 1/2, not yet started) — confirmed in a real
+  screenshot that the new shell wraps Settings' still-unstyled content
+  correctly without breaking it.
+- Live-verified in a real headless browser (Playwright script, not just
+  `tsc`/`npm test`) against the real dev server + dev DB: logged in,
+  screenshotted Login/Dashboard/Engagements/Settings at desktop width and
+  Dashboard at mobile width (375px — sidebar correctly collapses to a
+  trigger icon, cards stack). `npx tsc --noEmit` clean, full `npm test`
+  suite still 195/195 passing (no service-layer logic touched this phase).
+
+**Gotcha for Phase 1/2 (don't repeat this detour):** `npx shadcn@latest
+init -d` defaults to the **Nova preset on `@base-ui/react` primitives**
+(not Radix), which uses a `render` prop instead of the classic `asChild`
+polymorphism pattern — incompatible with how every shadcn example/doc on
+the internet is written. Re-initialized with `-b radix -p nova` instead.
+**Also**: both `shadcn init` *and* `shadcn add` for components already
+present overwrite `src/app/globals.css`'s color tokens back to shadcn's
+default greyscale oklch palette — if you ever re-run `shadcn add` for a
+new component, check `git diff src/app/globals.css` after and re-paste
+the Flowdesk tokens (full values in the plan file) if it got clobbered
+again. It did NOT touch `components.json` destructively — that one's safe.
+
+**Found a real, unrelated bug while screenshot-testing (not fixed, not
+in scope — flagging for whenever auth is next touched):** the first-time
+signup flow (`/login` → email → OTP → "what's your business called?" →
+create workspace) is **broken**. `verifyOtp()` in `src/lib/otp.ts` marks
+the OTP code `consumedAt` on its *first* successful check — but
+`src/app/api/auth/verify-otp/route.ts` calls it once just to detect
+"new user, need a business name" (200 response, `needsBusinessName:
+true`), then the login page's second submission re-sends the **same**
+already-consumed code, which now fails with "not found" (400). Any
+brand-new tenant signup currently cannot complete today. Worked around
+it for screenshot purposes by seeding a tenant directly in Postgres
+rather than touching this code during a styling-only phase.
+
 ## Notes for whoever (human or Claude) picks this up next
 
 - Don't re-derive the lifecycle state machine, tenant isolation pattern, or

@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * Flowdesk design tokens — colors/typography pulled from lyrra.co.in's
+ * production CSS (itself inspired by nontechnical.dev), per the user's
+ * explicit direction. Light/dark pairs both defined so dark mode is free
+ * once a toggle exists later; for now it follows the OS preference.
+ * `npx shadcn init`/`add` regenerates its own default (grayscale oklch)
+ * values into this file — if that happens again, re-paste the Flowdesk
+ * values back in rather than keeping shadcn's defaults.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --canvas: #efe9dc;
+  --paper: #f5f4ed;
+  --ink: #0b0d0b;
+  --prose: #1c1d1a;
+  --muted: #52534e;
+  --soft: #65655c;
+  --accent: #f7591f;
+  --accent-text: #b23c0c;
+  --accent-tint: #f7591f1a;
+  --danger: #b3261e;
+  --success: #2f7d4f;
+  --rule: #0b0d0b1f;
+  --rule-soft: #0b0d0b0f;
+
+  --radius: 0.5rem;
+
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: #fff8f2;
+  --secondary: var(--paper);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--accent-text);
+  --destructive: var(--danger);
+  --destructive-foreground: #fff5f4;
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--accent);
+
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: #fff8f2;
+  --sidebar-accent: var(--accent-tint);
+  --sidebar-accent-foreground: var(--accent-text);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--accent);
+
+  --chart-1: var(--accent);
+  --chart-2: var(--success);
+  --chart-3: var(--muted);
+  --chart-4: var(--soft);
+  --chart-5: var(--danger);
+}
+
+.dark {
+  --canvas: #14130c;
+  --paper: #1c1b13;
+  --ink: #f4f0e4;
+  --prose: #d9d5c7;
+  --muted: #b3b0a1;
+  --soft: #9a9789;
+  --accent: #ff6a3a;
+  --accent-text: #ff8a5c;
+  --accent-tint: #ff6a3a2e;
+  --danger: #ff7a6b;
+  --success: #5cc48a;
+  --rule: #f4f0e424;
+  --rule-soft: #f4f0e412;
+
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: #1c0a02;
+  --secondary: var(--paper);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--accent-text);
+  --destructive: var(--danger);
+  --destructive-foreground: #2a0a07;
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--accent);
+
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: #1c0a02;
+  --sidebar-accent: var(--accent-tint);
+  --sidebar-accent-foreground: var(--accent-text);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--accent);
+
+  --chart-1: var(--accent);
+  --chart-2: var(--success);
+  --chart-3: var(--muted);
+  --chart-4: var(--soft);
+  --chart-5: var(--danger);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-tint);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-prose: var(--prose);
+  --color-soft: var(--soft);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
