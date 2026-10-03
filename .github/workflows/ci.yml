@@ -53,4 +53,16 @@ jobs:
       # back gracefully (dev-mode console.log) when a provider key is unset
       # or a provider call fails, same behavior this suite already relies on
       # locally (this repo's own .env ships an empty ANTHROPIC_API_KEY).
+      #
+      # S3_* is different: src/lib/storage/s3.ts's requireEnv() throws hard
+      # with no graceful fallback (unlike the providers above), so the test
+      # suite needs *some* value here. These are dummy/non-functional — no
+      # test uploads/deletes a real object, only getSignedDownloadUrl()
+      # (presigning), which is a local HMAC computation with no network
+      # call, so a fake endpoint/key works exactly like a real one would.
       - run: npm test
+        env:
+          S3_ENDPOINT: "https://example-ci-placeholder.invalid"
+          S3_BUCKET: "ci-placeholder"
+          S3_ACCESS_KEY_ID: "ci-placeholder"
+          S3_SECRET_ACCESS_KEY: "ci-placeholder"
