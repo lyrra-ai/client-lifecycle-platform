@@ -70,3 +70,19 @@ export async function sendWhatsAppMessage(params: SendWhatsAppMessageParams): Pr
     throw new Error(`WhatsApp send failed (${response.status}): ${errorBody}`);
   }
 }
+
+/**
+ * Verifies Meta's `X-Hub-Signature-256` header on an inbound webhook POST —
+ * same HMAC-over-raw-body pattern as Razorpay's webhook
+ * (src/lib/integrations/razorpay.ts's verifyWebhookSignature), keyed by the
+ * app secret (Meta App Dashboard → Settings → Basic → App Secret) rather
+ * than the system-user API token used for sending.
+ */
+export function verifyWebhookSignature(rawBody: string, signatureHeader: string, appSecret: string): boolean {
+  const crypto = require("node:crypto") as typeof import("node:crypto");
+  const expected = `sha256=${crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex")}`;
+  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = Buffer.from(signatureHeader);
+  if (expectedBuffer.length !== actualBuffer.length) return false;
+  return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+}
