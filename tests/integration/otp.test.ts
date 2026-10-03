@@ -22,6 +22,29 @@ describe("createOtp / verifyOtp (generic, identifier-based)", () => {
     expect(result).toEqual({ ok: false, reason: "too_many_attempts" });
   });
 
+  it("consume=false checks validity without spending the code, so a real verify right after still succeeds (signup flow's new-user probe step)", async () => {
+    const code = await createOtp("+919876543210");
+
+    const probe = await verifyOtp("+919876543210", code, 5, false);
+    expect(probe).toEqual({ ok: true });
+
+    const real = await verifyOtp("+919876543210", code);
+    expect(real).toEqual({ ok: true });
+
+    const reused = await verifyOtp("+919876543210", code);
+    expect(reused.ok).toBe(false);
+  });
+
+  it("consume=false still increments attempts on a wrong code (brute-force protection applies either way)", async () => {
+    await createOtp("+919876543210");
+
+    const probe = await verifyOtp("+919876543210", "000000", 5, false);
+    expect(probe).toEqual({ ok: false, reason: "incorrect" });
+
+    const otp = await prisma.otpCode.findFirstOrThrow({ where: { identifier: "+919876543210" } });
+    expect(otp.attempts).toBe(1);
+  });
+
   it("rejects an expired code", async () => {
     const code = await createOtp("+919876543210");
     await prisma.otpCode.updateMany({

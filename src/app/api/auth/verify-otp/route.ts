@@ -22,7 +22,16 @@ export async function POST(req: Request) {
   const { email, code, businessName } = parsed.data;
   const normalizedEmail = email.trim().toLowerCase();
 
-  const result = await verifyLoginOtp(normalizedEmail, code);
+  let user = await prisma.user.findFirst({ where: { email: normalizedEmail } });
+
+  // Only spend the code once we know this verification won't need a second
+  // round trip: an existing user logs in immediately, and a new user with a
+  // business name already in hand is also done after this check. A new user
+  // with no business name yet is just a probe ("does this email need one?")
+  // — consuming the code here would make the real submission that follows
+  // (same code, now with businessName filled in) fail as already-used.
+  const consume = Boolean(user) || Boolean(businessName);
+  const result = await verifyLoginOtp(normalizedEmail, code, consume);
   if (!result.ok) {
     const messages: Record<typeof result.reason, string> = {
       not_found: "Request a new code first.",
@@ -32,8 +41,6 @@ export async function POST(req: Request) {
     };
     return NextResponse.json({ error: messages[result.reason] }, { status: 400 });
   }
-
-  let user = await prisma.user.findFirst({ where: { email: normalizedEmail } });
 
   if (!user) {
     if (!businessName) {

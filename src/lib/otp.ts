@@ -52,10 +52,21 @@ export type VerifyOtpResult =
  * code; e-sign is stricter at 3 (PRD §5) before falling back to "contact
  * the agency" messaging.
  */
+/**
+ * @param consume Pass false to check the code without spending it — used by
+ * the login route's "is this a known user" probe step (System Design §4's
+ * email+OTP signup flow), where a second real verification follows
+ * immediately after collecting the business name. Consuming it on the
+ * probe would make that second step fail with "not_found" even though the
+ * code was correct (the bug this parameter fixes — see PROGRESS.md
+ * iteration 21). Attempt-counting (brute-force protection) still applies
+ * regardless of this flag.
+ */
 export async function verifyOtp(
   identifier: string,
   code: string,
   maxAttempts = 5,
+  consume = true,
 ): Promise<VerifyOtpResult> {
   const otp = await prisma.otpCode.findFirst({
     where: { identifier, consumedAt: null },
@@ -74,10 +85,12 @@ export async function verifyOtp(
     return { ok: false, reason: "incorrect" };
   }
 
-  await prisma.otpCode.update({
-    where: { id: otp.id },
-    data: { consumedAt: new Date() },
-  });
+  if (consume) {
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { consumedAt: new Date() },
+    });
+  }
   return { ok: true };
 }
 
@@ -109,6 +122,6 @@ export async function requestLoginOtp(email: string): Promise<void> {
   }
 }
 
-export async function verifyLoginOtp(email: string, code: string): Promise<VerifyOtpResult> {
-  return verifyOtp(email.trim().toLowerCase(), code, 5);
+export async function verifyLoginOtp(email: string, code: string, consume = true): Promise<VerifyOtpResult> {
+  return verifyOtp(email.trim().toLowerCase(), code, 5, consume);
 }

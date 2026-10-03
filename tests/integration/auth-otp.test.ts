@@ -53,6 +53,17 @@ describe("requestLoginOtp / verifyLoginOtp", () => {
     expect(result).toEqual({ ok: false, reason: "too_many_attempts" });
   });
 
+  it("verifyLoginOtp(email, code, false) doesn't consume the code, so a real verify right after still succeeds — the first-time-signup bug fix (PROGRESS.md iteration 21): the route probes 'is this a known user' before asking for a business name, and that probe must not burn the code the real submission needs a moment later", async () => {
+    await requestLoginOtp("new-tenant-owner@example.com");
+    const code = await latestCodeFor("new-tenant-owner@example.com");
+
+    const probe = await verifyLoginOtp("new-tenant-owner@example.com", code, false);
+    expect(probe).toEqual({ ok: true });
+
+    const real = await verifyLoginOtp("new-tenant-owner@example.com", code);
+    expect(real).toEqual({ ok: true });
+  });
+
   it("normalizes email case/whitespace so a differently-cased retry still matches", async () => {
     await requestLoginOtp("  Owner@Example.com  ");
     const code = await latestCodeFor("owner@example.com");
